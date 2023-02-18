@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include<netdb.h>
+#include <stdbool.h>
 
 #include <errno.h>
 #include <string.h>
@@ -17,6 +18,8 @@
 #include "Node.h"
 
 #include "ConfigParser.h"
+
+#include "Message.h"
 
 #define IP_ADDR INADDR_ANY
 #define BUFFER_SIZE 200
@@ -31,6 +34,9 @@ int CreateSocket(int port);
 void ConnectToNeighbours();
 void AcceptConnections();
 void HandleMessages(void *);
+struct Message createConnectionMessage();
+bool isSynchronized();
+
 
 //checks if port number is within valid range 
 int ValidatePort(int port)
@@ -68,6 +74,12 @@ int ValidateIPAddress(char * ip_addr)
 	{
 		return 1;
 	}
+}
+
+struct Message createConnectionMessage(){
+	struct Message msg;
+	msg.msgT = CONNECTION;
+	return msg;
 }
 
 int ResolveHostnameToIP(char * hostname , char* ip)
@@ -210,7 +222,11 @@ void ConnectToNeighbours()
 
 		printf("<%s,%d> Sending Message (%s) to Server on Socket %d!\n",__FILE__,__LINE__,send_buffer,nodeInfo.neighbourSockets[node_socket_index]);
 
-		error_code = send(nodeInfo.neighbourSockets[node_socket_index],send_buffer,sizeof(send_buffer),0);
+		struct Message msg = createConnectionMessage();
+		msg.srcUID = atoi(nodeInfo.myUID);
+		printf("My current UID : %d\n",msg.srcUID);
+		//error_code = send(nodeInfo.neighbourSockets[node_socket_index],q,sizeof(send_buffer),0);
+		error_code = send(nodeInfo.neighbourSockets[node_socket_index], &msg, sizeof(msg),0);
 		if (error_code < 0)
 		{
 			printf("<%s,%d> Error Sending Message (%s) to Server on Socket %d - error: %s!\n",__FILE__,__LINE__,send_buffer,nodeInfo.neighbourSockets[node_socket_index],strerror(errno));
@@ -296,7 +312,8 @@ void AcceptConnections()
 		}
 
 		memset(recv_buffer,'\0',sizeof(recv_buffer));
-		error_code = recv(node_socket,&recv_buffer,sizeof(recv_buffer),0);
+		struct Message recv_msg;
+		error_code = recv(node_socket,&recv_msg,sizeof(recv_buffer),0);
 
 		if(error_code < 0)
 		{
@@ -305,23 +322,25 @@ void AcceptConnections()
 		}
 		else
 		{
-			printf("<%s,%d> Received Message (%s) from Server at Socket %d!\n",__FILE__,__LINE__,recv_buffer,node_socket);
+			//printf("<%s,%d> Received Message (%s) from Server at Socket %d!\n",__FILE__,__LINE__,recv_buffer,node_socket);
+			printf("Received message size :%lu\n", sizeof(recv_msg));
+			printf("Message Types: %d\n", recv_msg.msgT);
 		}
 
-		char* node_uid;
-		if(NULL != strstr(recv_buffer,"INCOMING_CONNECTION"))
-		{
-			strtok(recv_buffer,":");
+		char* node_uid = "123";
+		// if(NULL != strstr(recv_buffer,"INCOMING_CONNECTION"))
+		// {
+		// 	strtok(recv_buffer,":");
 			
-			if(NULL == (node_uid = strtok(NULL,":")))
-			{
-				printf("<%s,%d> Failed to get UID!",__FILE__,__LINE__);
-			}
-			else
-			{
+		// 	if(NULL == (node_uid = strtok(NULL,":")))
+		// 	{
+		// 		printf("<%s,%d> Failed to get UID!",__FILE__,__LINE__);
+		// 	}
+		// 	else
+		// 	{
 
-			}
-		}
+		// 	}
+		// }
 
 		int neighbourIndex = 0;
 		int i;
@@ -385,6 +404,28 @@ void HandleMessages(void *ni)
 	char recv_buffer[BUFFER_SIZE];
 
 	printf("<%s,%d> in HandleMessage\n",__FILE__,__LINE__);
+}
+
+bool isSynchronized(){
+	int currMin = nodeInfo.maxRoundsInNeighbours[0];
+	int currMax = nodeInfo.maxRoundsInNeighbours[0];
+
+	for (int i = 0 ;i < nodeInfo.numNeighbours; i++){
+		if (nodeInfo.maxRoundsInNeighbours[i] < currMin){
+			currMin = nodeInfo.maxRoundsInNeighbours[i];
+		}
+		
+		if(nodeInfo.maxRoundsInNeighbours[i] > currMax){
+			currMax = nodeInfo.maxRoundsInNeighbours[i];
+		}
+	}
+
+	if ((currMax - currMin) >= 2){
+		return false;
+	}
+	else{
+		return true;
+	}
 }
 
 void PelegsAlgorithm()

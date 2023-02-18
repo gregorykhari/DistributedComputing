@@ -18,6 +18,7 @@ struct Node
 	char neighbourListeningPorts[MAX_NEIGHBOURS][10];
     char neighbourUIDs[MAX_NEIGHBOURS][10];
     int neighbourSockets[MAX_NEIGHBOURS];  
+    int maxRoundsInNeighbours[MAX_NEIGHBOURS];
     pthread_t neighbourThreads[MAX_NEIGHBOURS];
 };
 
