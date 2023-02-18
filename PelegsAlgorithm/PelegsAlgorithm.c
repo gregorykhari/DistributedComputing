@@ -383,7 +383,7 @@ void AcceptConnections()
 		}     
 
 		//create thread for receiving data from servers
-		error_code = pthread_create(&nodeInfo.neighbourThreads[neighbourIndex],&attr,(void *)HandleMessages,ni);
+		error_code = pthread_create(&nodeInfo.neighbourThreads[neighbourIndex],&attr,(void *)HandleMessages,&recv_msg);
 		if(error_code != 0)
 		{
 			printf("<%s,%d> Failed to create HandleServer thread for Client at socket %d - error: %d\n",__FILE__,__LINE__,error_code,nodeInfo.neighbourSockets[neighbourIndex]);
@@ -396,14 +396,33 @@ void AcceptConnections()
 	}
 }
 
-void HandleMessages(void *ni)
+void HandleMessages(void *recv)
 {
-	int neighbourIndex = *((int*)ni);
+	struct Message recv_msg = *((struct Message *)recv);
+	//int neighbourIndex = *((int*)ni);
 
 	char send_buffer[BUFFER_SIZE];
 	char recv_buffer[BUFFER_SIZE];
 
-	printf("<%s,%d> in HandleMessage\n",__FILE__,__LINE__);
+	switch (recv_msg.msgT){
+
+		case CONNECTION:
+			printf("<%s,%s, %d>: Message Type: CONNECTION\n", __FILE__, __func__, __LINE__);
+			break;
+		
+		case FLOOD:
+			printf("<%s,%s, %d>: Message Type: FLOOD\n", __FILE__, __func__, __LINE__);
+			break;
+
+		case FLOOD_TERMINATE:
+			printf("<%s,%s, %d>: Message Type: FLOOD_TERMINATE\n", __FILE__, __func__, __LINE__);
+			break;
+
+
+	default:
+		printf("<%s,%s, %d>: Message Type: CONNECTION\n", __FILE__, __func__, __LINE__);
+	
+	}
 }
 
 bool isSynchronized(){
