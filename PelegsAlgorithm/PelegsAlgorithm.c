@@ -38,7 +38,7 @@ void CloseConnections();
 void HandleMessages(void *);
 struct Message createConnectionMessage();
 struct Message createFloodMessage();
-struct Message createFloodTerminationMessage();
+struct Message CreateFloodTerminationMessage();
 struct Message createSearchMessage();
 struct Message CreateACKMessage();
 struct Message CreateNACKMessage();
@@ -46,7 +46,7 @@ void sendFloodMessage();
 void sendFloodTerminationMessage();
 bool isTerminationReached();
 bool isSynchronized();
-void PelegsAlgorithm(struct Message &msg);
+void PelegsAlgorithm(struct Message msg);
 
 //checks if port number is within valid range 
 int ValidatePort(int port)
@@ -122,6 +122,7 @@ struct Message CreateSearchMessage()
 	msg.msgT = SEARCH;
 	return msg;
 }
+
 
 struct Message CreateACKMessage()
 {
@@ -386,7 +387,8 @@ void AcceptConnections()
 			printf("Message Types: %d\n", recv_msg.msgT);
 		}
 
-		char* node_uid = "123";
+		char node_uid[BUFFER_SIZE];
+		sprintf(node_uid, "%d", recv_msg.srcUID);
 		// if(NULL != strstr(recv_buffer,"INCOMING_CONNECTION"))
 		// {
 		// 	strtok(recv_buffer,":");
@@ -533,29 +535,29 @@ void CloseConnections()
 	}
 }
 
-void PelegsAlgorithm(struct Message & msg)
+void PelegsAlgorithm(struct Message msg)
 {
-	if(nodeInfo.maxUIDSeen == msg->currMaxUID){
+	if(nodeInfo.maxUIDSeen == msg.currMaxUID){
 		nodeInfo.currLeaderCount++;
 	}
 	struct Message reply_msg;
 	if(nodeInfo.currLeaderCount > 3){
 		//Start a flood terminate message!
 		printf("<%s,%s, %d>: Start the flood!\n", __FILE__, __func__, __LINE__);
-		reply_msg = createFloodTerminationMessage();
+		reply_msg = CreateFloodTerminationMessage();
 	}
 	else{
-		if(nodeInfo.maxUIDSeen < msg->currMaxUID){
+		if(nodeInfo.maxUIDSeen < msg.currMaxUID){
 			printf("<%s,%s, %d>: Received Message with larger UID\t Need to update!\n", __FILE__, __func__, __LINE__);
-			nodeInfo.maxUIDSeen = msg->currMaxUID;
-			nodeInfo.currDistToNode = msg->currDist + 1;
+			nodeInfo.maxUIDSeen = msg.currMaxUID;
+			nodeInfo.currDistToNode = msg.currDist + 1;
 			nodeInfo.maxDist = nodeInfo.maxDist;
 			nodeInfo.currLeaderCount = 1;
 		}
 		else if(nodeInfo.maxUIDSeen == msg.currMaxUID){
 			printf("<%s,%s, %d>: Received Message with the same UID\t Setting the max\n", __FILE__, __func__, __LINE__);
-			if(msg->currMaxDist > nodeInfo.maxDist)
-				nodeInfo.maxDist = msg->currMaxDist;
+			if(msg.currMaxDist > nodeInfo.maxDist)
+				nodeInfo.maxDist = msg.currMaxDist;
 		}
 
 		reply_msg = createFloodMessage();
@@ -583,7 +585,7 @@ void BFS()
 		int i = 0;
 		for(i = 0; i < nodeInfo.numNeighbours; i++)
 		{
-			struct Message msg = createSearchMessage();
+			//struct Message msg = createSearchMessage();
 
 		}
 	}
