@@ -46,6 +46,7 @@ void sendFloodMessage();
 void sendFloodTerminationMessage();
 bool isTerminationReached();
 bool isSynchronized();
+void PelegsAlgorithm(struct Message &msg);
 
 //checks if port number is within valid range 
 int ValidatePort(int port)
@@ -472,6 +473,7 @@ void HandleMessages(void *recv)
 		
 		case FLOOD:
 			printf("<%s,%s, %d>: Message Type: FLOOD\n", __FILE__, __func__, __LINE__);
+			PelegsAlgorithm(recv_msg);
 			break;
 
 		case FLOOD_TERMINATE:
@@ -531,25 +533,45 @@ void CloseConnections()
 	}
 }
 
-void PelegsAlgorithm()
+void PelegsAlgorithm(struct Message & msg)
 {
-	//wait for all nodes to be connected
-	while(1)
-	{
-		int i;
-		int done = 1;
-		for(i = 0; i < nodeInfo.numNeighbours; i++)
-		{
-			if(-1 == nodeInfo.neighbourSockets[i])
-			{
-				done = 0;
-			}
-		}
-		if(1 == done)
-		{
-			break;
-		}
+	if(nodeInfo.maxUIDSeen == msg->currMaxUID){
+		nodeInfo.currLeaderCount++;
 	}
+	struct Message reply_msg;
+	if(nodeInfo.currLeaderCount > 3){
+		//Start a flood terminate message!
+		printf("<%s,%s, %d>: Start the flood!\n", __FILE__, __func__, __LINE__);
+		reply_msg = createFloodTerminationMessage();
+	}
+	else{
+		if(nodeInfo.maxUIDSeen < msg->currMaxUID){
+			printf("<%s,%s, %d>: Received Message with larger UID\t Need to update!\n", __FILE__, __func__, __LINE__);
+			nodeInfo.maxUIDSeen = msg->currMaxUID;
+			nodeInfo.currDistToNode = msg->currDist + 1;
+			nodeInfo.maxDist = nodeInfo.maxDist;
+			nodeInfo.currLeaderCount = 1;
+		}
+		else if(nodeInfo.maxUIDSeen == msg.currMaxUID){
+			printf("<%s,%s, %d>: Received Message with the same UID\t Setting the max\n", __FILE__, __func__, __LINE__);
+			if(msg->currMaxDist > nodeInfo.maxDist)
+				nodeInfo.maxDist = msg->currMaxDist;
+		}
+
+		reply_msg = createFloodMessage();
+	}
+
+	
+
+	//Create a Flood message and send this message to all my neighbours!
+
+	//struct Message flood_msg = createFloodMessage();
+
+	for(int i =0; i < nodeInfo.numNeighbours; i++){
+		reply_msg.dstUID = atoi(nodeInfo.neighbourUIDs[i]);
+		send(nodeInfo.neighbourSockets[i], &reply_msg, sizeof(reply_msg), 0);
+	}
+
 }
 
 void BFS()
@@ -565,6 +587,19 @@ void BFS()
 
 		}
 	}
+}
+
+void initNode(){
+	nodeInfo.mySocket = -1;
+	for (int i = 0; i < nodeInfo.numNeighbours; i++){
+		nodeInfo.neighbourSockets[i] = -1;
+		nodeInfo.maxRoundsInNeighbours[i] = 0;
+	}
+
+	nodeInfo.maxUIDSeen = atoi(nodeInfo.myUID);
+	nodeInfo.maxDist = 0;
+	nodeInfo.currDistToNode = 0;
+	nodeInfo.currLeaderCount= 1;
 }
 
 void printHelp()
@@ -604,6 +639,8 @@ int main(int argc, char** argv)
 	printf("<%s,%d> Initializing Node With UID %s\n",__FILE__,__LINE__,myUID);
 
 	nodeInfo = Parse(myUID,pathToConfig);
+
+	initNode();
 
 	PrintNodeInfo(nodeInfo);
 
