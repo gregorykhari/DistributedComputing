@@ -34,15 +34,18 @@ int ResolveHostnameToIP(char* , char*);
 int CreateSocket(int port);
 void ConnectToNeighbours();
 void AcceptConnections();
+void CloseConnections();
 void HandleMessages(void *);
 struct Message createConnectionMessage();
 struct Message createFloodMessage();
-struct Message createFloodTerminationMsg();
-void sendFloodMsg();
-void sendFloodTerminationMsg();
+struct Message createFloodTerminationMessage();
+struct Message createSearchMessage();
+struct Message CreateACKMessage();
+struct Message CreateNACKMessage();
+void sendFloodMessage();
+void sendFloodTerminationMessage();
 bool isTerminationReached();
 bool isSynchronized();
-
 
 //checks if port number is within valid range 
 int ValidatePort(int port)
@@ -82,6 +85,8 @@ int ValidateIPAddress(char * ip_addr)
 	}
 }
 
+
+
 struct Message createConnectionMessage(){
 	struct Message msg;
 	msg.srcUID = atoi(nodeInfo.myUID);
@@ -99,7 +104,7 @@ struct Message createFloodMessage(){
 	return msg;
 }
 
-struct Message createFloodTerminationMsg(){
+struct Message CreateFloodTerminationMessage(){
 	struct Message msg;
 	msg.srcUID = atoi(nodeInfo.myUID);
 	msg.currMaxUID = nodeInfo.maxUIDSeen;
@@ -109,10 +114,35 @@ struct Message createFloodTerminationMsg(){
 	return msg;
 }
 
+struct Message CreateSearchMessage()
+{
+	struct Message msg;
+	msg.srcUID = atoi(nodeInfo.myUID);
+	msg.msgT = SEARCH;
+	return msg;
+}
+
+struct Message CreateACKMessage()
+{
+	struct Message msg;
+	msg.srcUID = atoi(nodeInfo.myUID);
+	msg.msgT = ACK;
+	return msg;
+}
+
+struct Message CreateNACKMessage()
+{
+	struct Message msg;
+	msg.srcUID = atoi(nodeInfo.myUID);
+	msg.msgT = ACK;
+	return msg;
+}
+
 bool isTerminationReached(){
 	//NEED to see the logic for this!
 	return false;
 }
+
 
 int ResolveHostnameToIP(char * hostname , char* ip)
 {
@@ -448,6 +478,17 @@ void HandleMessages(void *recv)
 			printf("<%s,%s, %d>: Message Type: FLOOD_TERMINATE\n", __FILE__, __func__, __LINE__);
 			break;
 
+		case SEARCH:
+			printf("<%s,%s, %d>: Message Type: SEARXG\n", __FILE__, __func__, __LINE__);
+			break;
+
+		case ACK:
+			printf("<%s,%s, %d>: Message Type: ACK\n", __FILE__, __func__, __LINE__);
+			break;
+
+		case NACK:
+			printf("<%s,%s, %d>: Message Type: NACK\n", __FILE__, __func__, __LINE__);
+			break;
 
 		default:
 			printf("<%s,%s, %d>: Message Type: CONNECTION\n", __FILE__, __func__, __LINE__);
@@ -480,6 +521,16 @@ bool isSynchronized(){
 	}
 }
 
+void CloseConnections()
+{
+	int i = 0;
+	for(i = 0; i < nodeInfo.numNeighbours; i++)
+	{
+		close(nodeInfo.neighbourSockets[i]);
+		printf("<%s,%d> Successfully Closed Connections to Neighbour with UID %s",__FILE__,__LINE__,nodeInfo.neighbourUIDs[i]);
+	}
+}
+
 void PelegsAlgorithm()
 {
 	//wait for all nodes to be connected
@@ -499,9 +550,23 @@ void PelegsAlgorithm()
 			break;
 		}
 	}
-
-
 }
+
+void BFS()
+{
+	if(LEADER == nodeInfo.status)
+	{
+		nodeInfo.marked = 1;	
+		nodeInfo.parentUID = -1;
+		int i = 0;
+		for(i = 0; i < nodeInfo.numNeighbours; i++)
+		{
+			struct Message msg = createSearchMessage();
+
+		}
+	}
+}
+
 void printHelp()
 {
 	printf("Expected:\n\t\tPelegsAlgorithm.o -u <NodeUID> -i <Path/To/Config/File>\n\n");
