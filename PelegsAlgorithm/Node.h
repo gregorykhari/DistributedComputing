@@ -21,6 +21,7 @@ struct Node
     char neighbourUIDs[MAX_NEIGHBOURS][10];
     int neighbourSockets[MAX_NEIGHBOURS];  
     int maxRoundsInNeighbours[MAX_NEIGHBOURS];
+    int maxUIDSeen, maxDist, currDistToNode;
     pthread_t neighbourThreads[MAX_NEIGHBOURS];
     int marked; //for BFS - whether a node has received a 
     int parentUID; //the UID of the parent node

@@ -25,6 +25,7 @@
 #define BUFFER_SIZE 200
 
 static struct Node nodeInfo;
+static bool isSync = false;
 
 void printHelp();
 int ValidatePort(int);
@@ -35,6 +36,11 @@ void ConnectToNeighbours();
 void AcceptConnections();
 void HandleMessages(void *);
 struct Message createConnectionMessage();
+struct Message createFloodMessage();
+struct Message createFloodTerminationMsg();
+void sendFloodMsg();
+void sendFloodTerminationMsg();
+bool isTerminationReached();
 bool isSynchronized();
 
 
@@ -78,8 +84,34 @@ int ValidateIPAddress(char * ip_addr)
 
 struct Message createConnectionMessage(){
 	struct Message msg;
+	msg.srcUID = atoi(nodeInfo.myUID);
 	msg.msgT = CONNECTION;
 	return msg;
+}
+
+struct Message createFloodMessage(){
+	struct Message msg;
+	msg.srcUID = atoi(nodeInfo.myUID);
+	msg.currUID = nodeInfo.maxUIDSeen;
+	msg.currDist = nodeInfo.currDistToNode;
+	msg.currMaxDist = nodeInfo.maxDist;
+	msg.msgT = FLOOD;
+	return msg;
+}
+
+struct Message createFloodTerminationMsg(){
+	struct Message msg;
+	msg.srcUID = atoi(nodeInfo.myUID);
+	msg.currUID = nodeInfo.maxUIDSeen;
+	msg.currDist = nodeInfo.currDistToNode;
+	msg.currMaxDist = nodeInfo.maxDist;
+	msg.msgT = FLOOD_TERMINATE;
+	return msg;
+}
+
+bool isTerminationReached(){
+	//NEED to see the logic for this!
+	return false;
 }
 
 int ResolveHostnameToIP(char * hostname , char* ip)
@@ -199,15 +231,12 @@ void ConnectToNeighbours()
 			{
 				printf("<%s,%d> Failed to create socket - error: %s!\n",__FILE__,__LINE__,strerror(errno));
 			}
-			else
-			{
-				printf("<%s,%d> Successfully created socket!\n",__FILE__,__LINE__);
-			}
+			
 
 			error_code = connect(nodeInfo.neighbourSockets[node_socket_index],(struct sockaddr *)&server_addr,sizeof(server_addr));
 			if (error_code != 0)
 			{
-
+				close(nodeInfo.neighbourSockets[node_socket_index]);
 			}
 			else
 			{
@@ -223,7 +252,6 @@ void ConnectToNeighbours()
 		printf("<%s,%d> Sending Message (%s) to Server on Socket %d!\n",__FILE__,__LINE__,send_buffer,nodeInfo.neighbourSockets[node_socket_index]);
 
 		struct Message msg = createConnectionMessage();
-		msg.srcUID = atoi(nodeInfo.myUID);
 		printf("My current UID : %d\n",msg.srcUID);
 		//error_code = send(nodeInfo.neighbourSockets[node_socket_index],q,sizeof(send_buffer),0);
 		error_code = send(nodeInfo.neighbourSockets[node_socket_index], &msg, sizeof(msg),0);
@@ -404,10 +432,12 @@ void HandleMessages(void *recv)
 	char send_buffer[BUFFER_SIZE];
 	char recv_buffer[BUFFER_SIZE];
 
-	switch (recv_msg.msgT){
+	while(1){
+		switch (recv_msg.msgT){
 
 		case CONNECTION:
 			printf("<%s,%s, %d>: Message Type: CONNECTION\n", __FILE__, __func__, __LINE__);
+			printf("Synchronized:- %d\n", isSynchronized());
 			break;
 		
 		case FLOOD:
@@ -419,10 +449,13 @@ void HandleMessages(void *recv)
 			break;
 
 
-	default:
-		printf("<%s,%s, %d>: Message Type: CONNECTION\n", __FILE__, __func__, __LINE__);
-	
+		default:
+			printf("<%s,%s, %d>: Message Type: CONNECTION\n", __FILE__, __func__, __LINE__);
+		
+		}
 	}
+
+	
 }
 
 bool isSynchronized(){
