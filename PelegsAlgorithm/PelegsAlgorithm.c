@@ -92,7 +92,7 @@ struct Message createConnectionMessage(){
 struct Message createFloodMessage(){
 	struct Message msg;
 	msg.srcUID = atoi(nodeInfo.myUID);
-	msg.currUID = nodeInfo.maxUIDSeen;
+	msg.currMaxUID = nodeInfo.maxUIDSeen;
 	msg.currDist = nodeInfo.currDistToNode;
 	msg.currMaxDist = nodeInfo.maxDist;
 	msg.msgT = FLOOD;
@@ -102,7 +102,7 @@ struct Message createFloodMessage(){
 struct Message createFloodTerminationMsg(){
 	struct Message msg;
 	msg.srcUID = atoi(nodeInfo.myUID);
-	msg.currUID = nodeInfo.maxUIDSeen;
+	msg.currMaxUID = nodeInfo.maxUIDSeen;
 	msg.currDist = nodeInfo.currDistToNode;
 	msg.currMaxDist = nodeInfo.maxDist;
 	msg.msgT = FLOOD_TERMINATE;
@@ -444,7 +444,7 @@ void HandleMessages(void *recv)
 			printf("<%s,%s, %d>: Message Type: FLOOD\n", __FILE__, __func__, __LINE__);
 			break;
 
-		case LEADER:
+		case FLOOD_TERMINATE:
 			printf("<%s,%s, %d>: Message Type: FLOOD_TERMINATE\n", __FILE__, __func__, __LINE__);
 			break;
 
@@ -578,13 +578,13 @@ int main(int argc, char** argv)
 	pthread_join(connectToNodes_tid,NULL);
 	pthread_join(acceptConnections_tid,NULL);
 
-	while(0 == establishedAllConnections());
+	//while(0 == establishedAllConnections());
 	
-	Pelegs();
+	//Pelegs();
 
 	while(UNKNOWN == nodeInfo.status);
 
-	BFS();
+	//BFS();
 
 	return 0;
 }
