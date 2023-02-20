@@ -414,7 +414,7 @@ void HandleMessages(void *recv)
 			printf("<%s,%s, %d>: Message Type: FLOOD\n", __FILE__, __func__, __LINE__);
 			break;
 
-		case FLOOD_TERMINATE:
+		case LEADER:
 			printf("<%s,%s, %d>: Message Type: FLOOD_TERMINATE\n", __FILE__, __func__, __LINE__);
 			break;
 
@@ -544,6 +544,14 @@ int main(int argc, char** argv)
 
 	pthread_join(connectToNodes_tid,NULL);
 	pthread_join(acceptConnections_tid,NULL);
+
+	while(0 == establishedAllConnections());
+	
+	Pelegs();
+
+	while(UNKNOWN == nodeInfo.status);
+
+	BFS();
 
 	return 0;
 }

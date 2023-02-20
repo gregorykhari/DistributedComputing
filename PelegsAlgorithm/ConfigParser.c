@@ -156,6 +156,8 @@ struct Node Parse(char* myUID, char* pathToConfig)
         }
 	}
 
+    fclose(fp);
+
     return nodeInfo;
 }
 

@@ -7,6 +7,8 @@
 #define MAX_NEIGHBOURS 100
 #endif
 
+enum LeaderStatus {LEADER, NON_LEADER, UNKNOWN};
+
 struct Node
 {
 	char myUID[10];
@@ -20,6 +22,10 @@ struct Node
     int neighbourSockets[MAX_NEIGHBOURS];  
     int maxRoundsInNeighbours[MAX_NEIGHBOURS];
     pthread_t neighbourThreads[MAX_NEIGHBOURS];
+    int marked; //for BFS - whether a node has received a 
+    int parentUID; //the UID of the parent node
+    int childrenUIDs[MAX_NEIGHBOURS]; // the UIDs of all children 
+    enum LeaderStatus status;
 };
 
 void PrintNodeInfo(struct Node nodeInfo);
