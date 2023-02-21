@@ -294,19 +294,14 @@ void ConnectToNeighbours()
 			else
 			{
 				printf("<%s,%s,%d> Successfully established connection to %s on port %d !\n",__FILE__,__func__,__LINE__,ipAddr,port);
+				printf("<%s,%s,%d> Successfully Established Connection at Socket = %d\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourSockets[node_socket_index]);
 				break;
 			}
 		}
 			
 		//send message to other node to let it know which socket to assign to
-		memset(send_buffer,'\0',sizeof(send_buffer));
-		sprintf(send_buffer,"INCOMING_CONNECTION:%s",nodeInfo.myUID);
-
-		printf("<%s,%s,%d> Sending Message (%s) to Server on Socket %d!\n",__FILE__,__func__,__LINE__,send_buffer,nodeInfo.neighbourSockets[node_socket_index]);
-
 		struct Message msg = createConnectionMessage();
 		printf("My current UID : %d\n",msg.srcUID);
-		//error_code = send(nodeInfo.neighbourSockets[node_socket_index],q,sizeof(send_buffer),0);
 		error_code = send(nodeInfo.neighbourSockets[node_socket_index], &msg, sizeof(msg),0);
 		if (error_code < 0)
 		{
@@ -379,6 +374,8 @@ void AcceptConnections()
 	{
 		char recv_buffer[BUFFER_SIZE];
 
+		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
+
 		//accept incoming connection request from client
 		int node_socket = accept(nodeInfo.mySocket,NULL,NULL);
 		if (node_socket < 0)
@@ -391,6 +388,8 @@ void AcceptConnections()
 			//do nothing
 			printf("<%s,%s,%d> Successfully established connection with client at socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
 		}
+
+		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
 
 		memset(recv_buffer,'\0',sizeof(recv_buffer));
 		struct Message recv_msg;
@@ -408,10 +407,12 @@ void AcceptConnections()
 			printf("Message Types: %d\n", recv_msg.msgT);
 		}
 
-		printf("<%s,%s,%d> Made it this far....\n",__FILE__,__func__,__LINE__);
+		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
 
 		char node_uid[BUFFER_SIZE];
 		sprintf(node_uid, "%d", recv_msg.srcUID);
+
+		printf("<%s,%s,%d> node_uid= %s\n",__FILE__,__func__,__LINE__,node_uid);
 
 		int neighbourIndex = 0;
 		int i;
@@ -425,7 +426,10 @@ void AcceptConnections()
 			}
 		}
 
-		printf("<%s,%s,%d> Made it this far....\n",__FILE__,__func__,__LINE__);
+
+		printf("<%s,%s,%d> Successfully Established Connection at Socket = %d\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourSockets[neighbourIndex]);
+
+		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
 
 		//create a variable to pass network socket to thread args
 		int* ni = malloc(sizeof(int));
@@ -440,9 +444,10 @@ void AcceptConnections()
 
 		*ni = neighbourIndex;
 
+		printf("<%s,%s,%d> Neighbour Indexes :%d\t :%d\n",__FILE__,__func__,__LINE__, neighbourIndex,ni);
 		pthread_attr_t attr;                                                                                                                
 
-		printf("<%s,%s,%d> Made it this far....\n",__FILE__,__func__,__LINE__);
+		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
 
 		error_code = pthread_attr_init(&attr);                                               
 		if (error_code == -1) {                                                              
@@ -457,8 +462,11 @@ void AcceptConnections()
 			exit(1);                                                                  
 		}     
 
+		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
+
+
 		//create thread for receiving data from servers
-		error_code = pthread_create(&nodeInfo.neighbourThreads[neighbourIndex],&attr,(void *)HandleMessages,&ni);
+		error_code = pthread_create(&nodeInfo.neighbourThreads[neighbourIndex],&attr,(void *)HandleMessages,ni);
 		if(error_code != 0)
 		{
 			printf("<%s,%s,%d> Failed to create HandleServer thread for Client at socket %d! Error_code: %d, Error: %s \n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[neighbourIndex],strerror(errno));
@@ -468,6 +476,9 @@ void AcceptConnections()
 		{
 			//do nothing
 		}
+
+		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
+
 	}
 }
 
@@ -475,9 +486,15 @@ void HandleMessages(void *ni)
 {
 	int neighbourIndex = *((int*)ni);
 
+	printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
+	printf("<%s,%s,%d> Neighbour Index: %d\n",__FILE__,__func__,__LINE__, neighbourIndex);
+
+	printf("<%s,%s,%d> In HandleMessage for Socket %d",__FILE__,__func__,__LINE__,nodeInfo.neighbourSockets[neighbourIndex]);
+
 	char recv_buffer[BUFFER_SIZE];
 	int error_code = recv(nodeInfo.neighbourSockets[neighbourIndex], &recv_buffer,sizeof(recv_buffer),0);
-	if (error_code < 0) {                                                              
+	if (error_code < 0) 
+	{                                                              
 		printf("<%s,%s,%d> Failed to receive message!\t %d\n",__FILE__,__func__,__LINE__,error_code);
 		exit(1);                                                                  
 	}
@@ -488,8 +505,12 @@ void HandleMessages(void *ni)
 	
 	struct Message recv_msg = *((struct Message *)recv);
 
+	//printf("<%s,%s,%d> In HandleMessage Thread for Node Socket %d\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourSockets[neighbourIndex]);
+
 	while(1)
 	{
+		while(0 == isSynchronized());
+		
 		switch (recv_msg.msgT)
 		{
 			case CONNECTION:
@@ -526,12 +547,15 @@ void HandleMessages(void *ni)
 		}
 
 		printf("<%s,%s, %d>: Waiting for message!\n", __FILE__, __func__, __LINE__);
-		int error_code = recv(nodeInfo.neighbourSockets[neighbourIndex], &recv_buffer,sizeof(recv_buffer),0);
+		error_code = recv(nodeInfo.neighbourSockets[neighbourIndex], &recv_buffer,sizeof(recv_buffer),0);
 		if (error_code < 0) {                                                              
 			printf("<%s,%s,%d> Failed to receive message!\t %d\n",__FILE__,__func__,__LINE__,error_code);
 			exit(1);                                                                  
 		} 
-		
+		else
+		{
+			//do nothing
+		}
 		recv_msg = *((struct Message *)recv);
 	}
 }
@@ -653,7 +677,8 @@ bool isSynchronized(){
 	int currMin = nodeInfo.maxRoundsInNeighbours[0];
 	int currMax = nodeInfo.maxRoundsInNeighbours[0];
 
-	for (int i = 0 ;i < nodeInfo.numNeighbours; i++){
+	int i;
+	for (i = 0 ;i < nodeInfo.numNeighbours; i++){
 
 		if (nodeInfo.maxRoundsInNeighbours[i] == -1){
 			return false;

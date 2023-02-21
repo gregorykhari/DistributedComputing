@@ -29,7 +29,7 @@ struct Node Parse(char* machineName, char* pathToConfig)
 
     if(NULL == (fp = fopen(pathToConfig,"r")))
     {
-        printf("<%s,%s,%d> ERROR: Failed to open config file %s for reading!",pathToConfig,__FILE__,__func__,__LINE__);
+        printf("<%s,%s,%d> ERROR: Failed to open config file %s for reading!",__FILE__,__func__,__LINE__,pathToConfig);
         exit(1);
     }
     else
