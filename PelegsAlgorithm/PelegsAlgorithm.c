@@ -105,6 +105,16 @@ struct Message createFloodMessage(){
 	return msg;
 }
 
+struct Message createFTM(){
+	struct Message msg;
+	msg.srcUID = atoi(nodeInfo.myUID);
+	msg.currMaxUID = nodeInfo.maxUIDSeen;
+	msg.currDist = nodeInfo.currDistToNode;
+	msg.currMaxDist = nodeInfo.maxDist;
+	msg.msgT = FLOOD_TERMINATE;
+	return msg;
+}
+
 struct Message CreateFloodTerminationMessage(){
 	struct Message msg;
 	msg.srcUID = atoi(nodeInfo.myUID);
@@ -114,6 +124,7 @@ struct Message CreateFloodTerminationMessage(){
 	msg.msgT = FLOOD_TERMINATE;
 	return msg;
 }
+
 
 struct Message CreateSearchMessage()
 {
@@ -536,6 +547,10 @@ bool isSynchronized(){
 	int currMax = nodeInfo.maxRoundsInNeighbours[0];
 
 	for (int i = 0 ;i < nodeInfo.numNeighbours; i++){
+
+		if (nodeInfo.maxRoundsInNeighbours[i] == -1){
+			return false;
+		}
 		if (nodeInfo.maxRoundsInNeighbours[i] < currMin){
 			currMin = nodeInfo.maxRoundsInNeighbours[i];
 		}
@@ -619,7 +634,7 @@ void initNode(){
 	nodeInfo.mySocket = -1;
 	for (int i = 0; i < nodeInfo.numNeighbours; i++){
 		nodeInfo.neighbourSockets[i] = -1;
-		nodeInfo.maxRoundsInNeighbours[i] = 0;
+		nodeInfo.maxRoundsInNeighbours[i] = -1;
 	}
 
 	nodeInfo.maxUIDSeen = atoi(nodeInfo.myUID);
