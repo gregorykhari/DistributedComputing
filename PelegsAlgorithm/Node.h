@@ -6,18 +6,22 @@
 #define MAX_NEIGHBOURS 100
 #endif
 
+#if !defined CHAR_BUFFER_SIZE
+#define CHAR_BUFFER_SIZE 100
+#endif
+
 enum LeaderStatus {LEADER, NON_LEADER, UNKNOWN};
 
 struct Node
 {
-	char myUID[10];
-    char myHostName[10];
-    char myListeningPort[10];
+	char myUID[CHAR_BUFFER_SIZE];
+    char myHostName[CHAR_BUFFER_SIZE];
+    char myListeningPort[CHAR_BUFFER_SIZE];
     int mySocket;
     int numNeighbours;
-	char neighbourHostNames[MAX_NEIGHBOURS][10];
-	char neighbourListeningPorts[MAX_NEIGHBOURS][10];
-    char neighbourUIDs[MAX_NEIGHBOURS][10];
+	char neighbourHostNames[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE];
+	char neighbourListeningPorts[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE];
+    char neighbourUIDs[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE];
     int neighbourSockets[MAX_NEIGHBOURS];  
     int maxRoundsInNeighbours[MAX_NEIGHBOURS];
     int maxUIDSeen;
@@ -26,9 +30,11 @@ struct Node
     int currLeaderCount;
     pthread_t neighbourThreads[MAX_NEIGHBOURS];
     int marked; //for BFS - whether a node has received a 
-    char parentUID[10]; //the UID of the parent node
-    char childrenUIDs[MAX_NEIGHBOURS][10]; // the UIDs of all children 
+    char parentUID[CHAR_BUFFER_SIZE]; //the UID of the parent node
+    char childrenUIDs[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE]; // the UIDs of all children 
     enum LeaderStatus status;
+    int neighbourRepliedToSearch[MAX_NEIGHBOURS];
+    int degree;
 };
 
 void PrintNodeInfo(struct Node nodeInfo);

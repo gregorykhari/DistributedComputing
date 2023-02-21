@@ -8,31 +8,33 @@ int isValidLine(char* line);
 
 char* removeLeadingTrailingWhitespace(char* line);
 
-struct Node Parse(char* myUID, char* pathToConfig)
+struct Node Parse(char* machineName, char* pathToConfig)
 {
-
     struct Node nodeInfo;
-    strcpy(nodeInfo.myUID,myUID);
 
     FILE *fp;
     char * line = NULL;
     size_t len = 0;
     ssize_t read;
 
-    char nodeUID[100][10];
-    char nodeHostName[100][10];
-	char nodeListeningPort[100][10];
+    char nodeUID[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE];
+    char nodeHostName[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE];
+	char nodeListeningPort[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE];
 
     int numNodes;
     int k,hostK;
     int LaFlag = 0, LbFlag = 0;
 
-    printf("Opening config file %s!\n",pathToConfig);
+    printf("<%s,%s,%d> Opening Config File %s!\n",__FILE__,__func__,__LINE__,pathToConfig);
 
     if(NULL == (fp = fopen(pathToConfig,"r")))
     {
-        printf("ERROR: Failed to open config file %s for reading!",pathToConfig);
+        printf("<%s,%s,%d> ERROR: Failed to open config file %s for reading!",pathToConfig,__FILE__,__func__,__LINE__);
         exit(1);
+    }
+    else
+    {
+        //do nothing
     }
 
     while (-1 != (read = getline(&line, &len, fp))) 
@@ -53,7 +55,7 @@ struct Node Parse(char* myUID, char* pathToConfig)
         free(str);
         str = NULL;
     }
-
+    
     //Parse file for La lines
     k = 0;
     while (-1 != (read = getline(&line, &len, fp))) 
@@ -67,8 +69,9 @@ struct Node Parse(char* myUID, char* pathToConfig)
             char* hostName = strtok(NULL," ");
             char* listeningPort = strtok(NULL," ");
 
-            if (0 == strcmp(myUID,uid))
+            if (0 == strcmp(machineName,hostName))
             {
+                strcpy(nodeInfo.myUID,uid);
                 strcpy(nodeInfo.myHostName,hostName);
                 strcpy(nodeInfo.myListeningPort,listeningPort);
 
@@ -82,7 +85,6 @@ struct Node Parse(char* myUID, char* pathToConfig)
             strcpy(nodeUID[k],uid);
             strcpy(nodeHostName[k],hostName);
             strcpy(nodeListeningPort[k],listeningPort);
-
 
             k++;
             if(k >= numNodes)
