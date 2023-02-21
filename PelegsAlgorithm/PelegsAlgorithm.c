@@ -54,7 +54,7 @@ void sendFloodMessage();
 void sendFloodTerminationMessage();
 bool isTerminationReached();
 
-void PelegsAlgorithm();
+void PelegsAlgorithm(struct Message msg);
 void BFS();
 
 bool isSynchronized();
@@ -444,7 +444,7 @@ void AcceptConnections()
 
 		*ni = neighbourIndex;
 
-		printf("<%s,%s,%d> Neighbour Indexes :%d\t :%d\n",__FILE__,__func__,__LINE__, neighbourIndex,ni);
+		printf("<%s,%s,%d> Neighbour Indexes :%d\t :%d\n",__FILE__,__func__,__LINE__, neighbourIndex,*ni);
 		pthread_attr_t attr;                                                                                                                
 
 		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
