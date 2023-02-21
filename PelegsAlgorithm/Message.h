@@ -2,7 +2,7 @@
 
 #include <stdint.h> 
 
-enum msgType {CONNECTION, FLOOD, FLOOD_TERMINATE, SEARCH, ACK, NACK};
+enum msgType {CONNECTION, FLOOD, FLOOD_TERMINATE, SEARCH, ACK, NACK, CLOSE};
 
 struct Message{
     uint32_t round;

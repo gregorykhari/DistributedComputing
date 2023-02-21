@@ -15,3 +15,17 @@ void PrintNodeInfo(struct Node nodeInfo)
 		printf("<%s,%d> %s\t\t%s\t\t%s\n",__FILE__,__LINE__,nodeInfo.neighbourUIDs[i],nodeInfo.neighbourHostNames[i],nodeInfo.neighbourListeningPorts[i]);
 	}
 }
+
+void PrintNodeBFSInfo(struct Node nodeInfo)
+{
+	int i;
+
+	printf("Parent of Node with UID %s: \n",nodeInfo.parentUID);
+
+	printf("Children of Node with UID %s: {",nodeInfo.myUID);
+	for(i = 0; i < nodeInfo.numNeighbours; i++)
+	{
+		printf("%s,\t",nodeInfo.childrenUIDs[i]);
+	}
+	printf(" }");
+}
