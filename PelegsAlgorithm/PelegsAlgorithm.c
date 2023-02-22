@@ -32,6 +32,7 @@ int ValidatePort(int);
 int ValidateIPAddress(char *);
 int ResolveHostnameToIP(char* , char*);
 
+int allConnectionsEstablished();
 int CreateSocket(int port);
 void ConnectToNeighbours();
 void AcceptConnections();
@@ -62,6 +63,21 @@ bool isSynchronized();
 void startFlood();
 void startFloodTerminate();
 void sendToAllNeighbours(struct Message msg);
+
+int allConnectionsEstablished()
+{
+	int flag = 1;
+	int i;
+	for(i = 0 ; i < nodeInfo.numNeighbours; i++)
+	{
+		if(nodeInfo.neighbourSockets[i] == -1)
+		{
+			flag = 0;
+			break;
+		}
+	}
+	return flag;
+}
 
 //checks if port number is within valid range 
 int ValidatePort(int port)
@@ -231,8 +247,10 @@ int CreateSocket(int port)
 }
 
 //connects to randomly selected server with information returned by ConnectToServer
-void sendToAllNeighbours(struct Message msg){
-	for(int i = 0; i < nodeInfo.numNeighbours; i++){
+void sendToAllNeighbours(struct Message msg)
+{
+	int i;
+	for( i = 0; i < nodeInfo.numNeighbours; i++){
 		msg.dstUID = atoi(nodeInfo.neighbourUIDs[i]);
 		int error_code = send(nodeInfo.neighbourSockets[i],&msg,sizeof(msg),0);
 		if(error_code < 0)
@@ -838,7 +856,10 @@ void initNode(){
 	nodeInfo.status = UNKNOWN;
 }
 
-void startFlood(){
+void startFlood()
+{
+
+	printf("<%s,%s, %d>: Starting FLOOD!\n", __FILE__, __func__, __LINE__);
 
 	struct Message msg = createFloodMessage();
 
@@ -909,8 +930,23 @@ int main(int argc, char** argv)
 
 	pthread_t connectToNodes_tid;
 
+	pthread_attr_t attr;                                                                                                                
+
+	int error_code = pthread_attr_init(&attr);                                               
+		if (error_code == -1) {                                                              
+			printf("<%s,%s,%d> Failed to create HandleMessages thread for Client at soc - error: %d\n",__FILE__,__func__,__LINE__,error_code);
+			exit(1);                                                                  
+		}                                                                            
+
+		int ds = PTHREAD_CREATE_DETACHED;                                                                      
+		error_code = pthread_attr_setdetachstate(&attr, ds);                                
+		if (error_code == -1) {                                                              
+			printf("<%s,%s,%d> Failed to create HandleMessages thread for Client at soc- error: %d\n",__FILE__,__func__,__LINE__,error_code);
+			exit(1);                                                                  
+		}    
+
 	//create thread for accepting incoming connections from clients
-	int error_code = pthread_create(&connectToNodes_tid,NULL,(void *)ConnectToNeighbours,NULL);
+	 error_code = pthread_create(&connectToNodes_tid,&attr,(void *)ConnectToNeighbours,NULL);
 
 	if(error_code != 0)
 	{
@@ -926,7 +962,7 @@ int main(int argc, char** argv)
 	pthread_t acceptConnections_tid;
 	
 	//create thread for accepting incoming connections from clients
-	error_code = pthread_create(&acceptConnections_tid,NULL,(void *)AcceptConnections,NULL);
+	error_code = pthread_create(&acceptConnections_tid,&attr,(void *)AcceptConnections,NULL);
 	if(error_code != 0)
 	{
 		printf("<%s,%s,%d> Failed To Create AcceptConnection Thread - error: %d\n",__FILE__,__func__,__LINE__,error_code);
@@ -941,7 +977,11 @@ int main(int argc, char** argv)
 	pthread_join(connectToNodes_tid,NULL);
 	pthread_join(acceptConnections_tid,NULL);
 
-	while(0 == isSynchronized());
+
+	while(0 == allConnectionsEstablished())
+	{
+		printf("<%s,%s,%d> Waiting for All Connections to Be Established...\n",__FILE__,__func__,__LINE__);
+	};
 	
 	//Pelegs();
 	startFlood();
