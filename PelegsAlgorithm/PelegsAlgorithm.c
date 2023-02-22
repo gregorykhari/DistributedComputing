@@ -57,6 +57,8 @@ struct Message CreateCloseMessage();
 void SendFloodMessage();
 void SendFloodTerminationMessage();
 bool isTerminationReached();
+int getMaxRoundToStart();
+int getNeighbourIndex(char *node_uid);
 
 void PelegsAlgorithm(struct Message msg);
 void BFS();
@@ -440,17 +442,8 @@ void AcceptConnections()
 		//determine index of node based on srcUID of CONNECTION message just received
 		char node_uid[BUFFER_SIZE];
 		sprintf(node_uid, "%d", recv_msg.srcUID);
-		int neighbourIndex = 0;
-		int i;
-		for(i = 0; i < nodeInfo.numNeighbours; i++)
-		{
-			if(0 == strcmp(nodeInfo.neighbourUIDs[i],node_uid))
-			{
-				neighbourIndex = i;
-				nodeInfo.neighbourSockets[neighbourIndex] = node_socket;
-				break;
-			}
-		}
+		int neighbourIndex = getNeighbourIndex(node_uid);
+		nodeInfo.neighbourSockets[neighbourIndex] = node_socket;
 
 		printf("<%s,%s,%d> Successfully Established Connection at Socket = %d\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourSockets[neighbourIndex]);
 
@@ -745,6 +738,31 @@ bool isSynchronized(){
 	}
 }
 
+int getMaxRoundToStart(){
+	int maxVal = 0, i = 0;
+	for(; i < nodeInfo.numNeighbours; i++){
+		if(nodeInfo.maxRoundsInNeighbours[i] > maxVal){
+			maxVal = nodeInfo.maxRoundsInNeighbours[i];
+		}
+	}
+	return maxVal + 1;
+}
+
+int getNeighbourIndex(char *node_uid){
+	int i, neighbourIndex = -1;
+	for(i = 0; i < nodeInfo.numNeighbours; i++)
+	{
+		if(0 == strcmp(nodeInfo.neighbourUIDs[i],node_uid))
+		{
+			neighbourIndex = i;
+			break;
+		}
+	}
+
+	return neighbourIndex;
+
+}
+
 void CloseConnections()
 {
 	int i = 0;
@@ -768,6 +786,13 @@ void PelegsAlgorithm(struct Message msg)
 {
 	if(nodeInfo.maxUIDSeen == msg.currMaxUID){
 		nodeInfo.currLeaderCount++;
+	}
+	//Update round in the nodeInfo
+	char node_uid[BUFFER_SIZE];
+	sprintf(node_uid, "%d", msg.srcUID);
+	int neighbourIdx = getNeighbourIndex(node_uid);
+	if(nodeInfo.maxRoundsInNeighbours[neighbourIdx] < msg.round){
+		nodeInfo.maxRoundsInNeighbours[neighbourIdx] = msg.round;
 	}
 	
 	if(nodeInfo.currLeaderCount > 3 && nodeInfo.maxUIDSeen == msg.currMaxUID){
@@ -835,6 +860,7 @@ void InitNode(){
 
 	nodeInfo.maxUIDSeen = atoi(nodeInfo.myUID);
 	nodeInfo.maxDist = 0;
+	nodeInfo.maxRound = 0;
 	nodeInfo.currDistToNode = 0;
 	nodeInfo.currLeaderCount= 1;
 	nodeInfo.status = UNKNOWN;
@@ -845,7 +871,8 @@ void StartFlood()
 	printf("<%s,%s, %d>: Starting FLOOD!\n", __FILE__, __func__, __LINE__);
 
 	struct Message msg = CreateFloodMessage();
-
+	int currRound = getMaxRoundToStart();
+	msg.round = currRound;
 	Broadcast(msg);
 	printf("<%s,%s, %d> Sent Message to All Neighbours!\n", __FILE__, __func__, __LINE__);
 }
@@ -853,6 +880,8 @@ void StartFlood()
 void StartFloodTerminate(){
 
 	struct Message msg = CreateFloodTerminationMessage();
+	int currRound = getMaxRoundToStart();
+	msg.round = currRound;
 	Broadcast(msg);
 	printf("<%s,%s, %d> Sent Message to All Neighbours!\n", __FILE__, __func__, __LINE__);
 }

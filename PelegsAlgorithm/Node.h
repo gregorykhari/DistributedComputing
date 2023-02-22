@@ -28,6 +28,7 @@ struct Node
     int maxDist;
     int currDistToNode;
     int currLeaderCount;
+    int maxRound;
     pthread_t neighbourThreads[MAX_NEIGHBOURS];
     int marked; //for BFS - whether a node has received a 
     char parentUID[CHAR_BUFFER_SIZE]; //the UID of the parent node
