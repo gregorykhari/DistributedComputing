@@ -29,7 +29,7 @@ static bool isSync = false;
 static const char* msgType_str[] = {"CONNECTION", "FLOOD", "FLOOD_TERMINATE", "SEARCH", "ACK", "NACK", "CLOSE"};
 
 
-void printHelp();
+void PrintHelp();
 int ValidatePort(int);
 int ValidateIPAddress(char *);
 int ResolveHostnameToIP(char* , char*);
@@ -42,20 +42,20 @@ void CloseConnections();
 void CloseConnection(int idx);
 
 void HandleMessages(void *);
-
 void HandleSearchMessage(struct Message);
 void HandleACKMessage(struct Message);
 void HandleNACKMessage(struct Message);
 
-struct Message createConnectionMessage();
-struct Message createFloodMessage();
+struct Message CreateConnectionMessage();
+struct Message CreateFloodMessage();
 struct Message CreateFloodTerminationMessage();
-struct Message createSearchMessage();
+struct Message CreateSearchMessage();
 struct Message CreateACKMessage();
 struct Message CreateNACKMessage();
+struct Message CreateCloseMessage();
 
-void sendFloodMessage();
-void sendFloodTerminationMessage();
+void SendFloodMessage();
+void SendFloodTerminationMessage();
 bool isTerminationReached();
 
 void PelegsAlgorithm(struct Message msg);
@@ -63,9 +63,9 @@ void BFS();
 
 bool isSynchronized();
 
-void startFlood();
-void startFloodTerminate();
-void sendToAllNeighbours(struct Message msg);
+void StartFlood();
+void StartFloodTerminate();
+void Broadcast(struct Message msg);
 
 int allConnectionsEstablished()
 {
@@ -120,7 +120,7 @@ int ValidateIPAddress(char * ip_addr)
 	}
 }
 
-struct Message createConnectionMessage()
+struct Message CreateConnectionMessage()
 {
 	struct Message msg;
 	msg.srcUID = atoi(nodeInfo.myUID);
@@ -128,7 +128,7 @@ struct Message createConnectionMessage()
 	return msg;
 }
 
-struct Message createFloodMessage(){
+struct Message CreateFloodMessage(){
 	struct Message msg;
 	msg.srcUID = atoi(nodeInfo.myUID);
 	msg.currMaxUID = nodeInfo.maxUIDSeen;
@@ -148,7 +148,6 @@ struct Message CreateFloodTerminationMessage(){
 	return msg;
 }
 
-
 struct Message CreateSearchMessage()
 {
 	struct Message msg;
@@ -156,7 +155,6 @@ struct Message CreateSearchMessage()
 	msg.msgT = SEARCH;
 	return msg;
 }
-
 
 struct Message CreateACKMessage()
 {
@@ -174,12 +172,20 @@ struct Message CreateNACKMessage()
 	return msg;
 }
 
+struct Message CreateCloseMessage()
+{
+	struct Message msg;
+	msg.srcUID = atoi(nodeInfo.myUID);
+	msg.msgT = CLOSE;
+	return msg;
+}
+
 bool isTerminationReached(){
 	//NEED to see the logic for this!
 	return false;
 }
 
-
+//converts the hostname of a machine to the ip address
 int ResolveHostnameToIP(char * hostname , char* ip)
 {
 	struct hostent *he;
@@ -240,7 +246,7 @@ int CreateSocket(int port)
 }
 
 //connects to randomly selected server with information returned by ConnectToServer
-void sendToAllNeighbours(struct Message msg)
+void Broadcast(struct Message msg)
 {
 	int i;
 	for( i = 0; i < nodeInfo.numNeighbours; i++){
@@ -316,10 +322,9 @@ void ConnectToNeighbours()
 			nodeInfo.neighbourSockets[node_socket_index] = socket(AF_INET,SOCK_STREAM,0);
 			if (nodeInfo.neighbourSockets[node_socket_index] < 0)
 			{
-				printf("<%s,%s,%d> Failed to create socket - error: %s!\n",__FILE__,__func__,__LINE__,strerror(errno));
+				printf("<%s,%s,%d> Failed to create socket! Error_code: %d .Error: %s!\n",__FILE__,__func__,__LINE__,error_code,strerror(errno));
 			}
 			
-
 			error_code = connect(nodeInfo.neighbourSockets[node_socket_index],(struct sockaddr *)&server_addr,sizeof(server_addr));
 			if (error_code != 0)
 			{
@@ -327,15 +332,13 @@ void ConnectToNeighbours()
 			}
 			else
 			{
-				printf("<%s,%s,%d> Successfully established connection to %s on port %d !\n",__FILE__,__func__,__LINE__,ipAddr,port);
-				printf("<%s,%s,%d> Successfully Established Connection at Socket = %d\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourSockets[node_socket_index]);
+				printf("<%s,%s,%d> Successfully Established Connection to Neighbour with UID %s on Port %d With Socket %d!\n",__FILE__,__func__,__LINE__,ipAddr,port,nodeInfo.neighbourSockets[node_socket_index]);
 				break;
 			}
 		}
 			
 		//send message to other node to let it know which socket to assign to
-		struct Message msg = createConnectionMessage();
-		printf("My current UID : %d\n",msg.srcUID);
+		struct Message msg = CreateConnectionMessage();
 		error_code = send(nodeInfo.neighbourSockets[node_socket_index], &msg, sizeof(msg),0);
 		if (error_code < 0)
 		{
@@ -408,8 +411,6 @@ void AcceptConnections()
 	{
 		char recv_buffer[BUFFER_SIZE];
 
-		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
-
 		//accept incoming connection request from client
 		int node_socket = accept(nodeInfo.mySocket,NULL,NULL);
 		if (node_socket < 0)
@@ -423,31 +424,22 @@ void AcceptConnections()
 			printf("<%s,%s,%d> Successfully established connection with client at socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
 		}
 
-		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
-
 		memset(recv_buffer,'\0',sizeof(recv_buffer));
-		struct Message recv_msg;
-		error_code = recv(node_socket,&recv_msg,sizeof(recv_buffer),0);
-
-		if(error_code < 0)
-		{
-			printf("<%s,%s,%d> Error while receiving message from Server at socket %d. Error %d : %s!\n",__FILE__,__func__,__LINE__,node_socket,error_code,strerror(errno));
-			return;
+		int error_code = recv(node_socket, &recv_buffer,sizeof(recv_buffer),0);
+		struct Message recv_msg = *((struct Message *)recv_buffer);
+		if (error_code < 0) 
+		{                                                              
+			printf("<%s,%s,%d> Error while receiving message from Neighbour at Socket %d. Error %d : %s!\n",__FILE__,__func__,__LINE__,node_socket,error_code,strerror(errno));
+			return;                                                              
 		}
 		else
 		{
-			//printf("<%s,%s,%d> Received Message (%s) from Server at Socket %d!\n",__FILE__,__func__,__LINE__,recv_buffer,node_socket);
-			printf("Received message size :%lu\n", sizeof(recv_msg));
-			printf("Message Types: %d\n", recv_msg.msgT);
+			printf("<%s,%s,%d> Successfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.dstUID,node_socket);
 		}
 
-		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
-
+		//determine index of node based on srcUID of CONNECTION message just received
 		char node_uid[BUFFER_SIZE];
 		sprintf(node_uid, "%d", recv_msg.srcUID);
-
-		printf("<%s,%s,%d> node_uid= %s\n",__FILE__,__func__,__LINE__,node_uid);
-
 		int neighbourIndex = 0;
 		int i;
 		for(i = 0; i < nodeInfo.numNeighbours; i++)
@@ -460,10 +452,7 @@ void AcceptConnections()
 			}
 		}
 
-
 		printf("<%s,%s,%d> Successfully Established Connection at Socket = %d\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourSockets[neighbourIndex]);
-
-		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
 
 		//create a variable to pass network socket to thread args
 		int* ni = malloc(sizeof(int));
@@ -481,8 +470,6 @@ void AcceptConnections()
 		printf("<%s,%s,%d> Neighbour Indexes :%d\t :%d\n",__FILE__,__func__,__LINE__, neighbourIndex,*ni);
 		pthread_attr_t attr;                                                                                                                
 
-		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
-
 		error_code = pthread_attr_init(&attr);                                               
 		if (error_code == -1) {                                                              
 			printf("<%s,%s,%d> Failed to create HandleMessages thread for Client at socket %d! Error_code: %d, Error: %s \n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[neighbourIndex],strerror(errno));
@@ -496,9 +483,6 @@ void AcceptConnections()
 			exit(1);                                                                  
 		}     
 
-		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
-
-
 		//create thread for receiving data from servers
 		error_code = pthread_create(&nodeInfo.neighbourThreads[neighbourIndex],&attr,(void *)HandleMessages,ni);
 		if(error_code != 0)
@@ -510,8 +494,6 @@ void AcceptConnections()
 		{
 			//do nothing
 		}
-
-		printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
 
 	}
 }
@@ -554,7 +536,7 @@ void HandleMessages(void *ni)
 					nodeInfo.status = NON_LEADER;
 					struct Message reply_msg = CreateFloodTerminationMessage();
 					printf("<%s,%s, %d>: FLOOD TERMINATE: Sending to all neighbours\n", __FILE__, __func__, __LINE__);	
-					sendToAllNeighbours(reply_msg);
+					Broadcast(reply_msg);
 				}
 				break;
 
@@ -766,9 +748,9 @@ bool isSynchronized(){
 void CloseConnections()
 {
 	int i = 0;
-	struct Message closeConnectionMsg = createConnectionMessage();
+	struct Message closeConnectionMsg = CreateConnectionMessage();
 	closeConnectionMsg.msgT = CLOSE;
-	sendToAllNeighbours(closeConnectionMsg);
+	Broadcast(closeConnectionMsg);
 	for(i = 0; i < nodeInfo.numNeighbours; i++)
 	{
 		close(nodeInfo.neighbourSockets[i]);
@@ -792,7 +774,7 @@ void PelegsAlgorithm(struct Message msg)
 		//Start a flood terminate message!
 		printf("<%s,%s, %d>: Start the flood Terminate!\n", __FILE__, __func__, __LINE__);
 		nodeInfo.status = LEADER;
-		startFloodTerminate();
+		StartFloodTerminate();
 	}
 	else{
 		if(nodeInfo.maxUIDSeen < msg.currMaxUID){
@@ -808,8 +790,8 @@ void PelegsAlgorithm(struct Message msg)
 				nodeInfo.maxDist = msg.currMaxDist;
 			printf("<%s,%s, %d>: RECV Same UID\t maxDistance: %d\n", __FILE__, __func__, __LINE__, nodeInfo.maxDist);
 		}
-		struct Message reply_msg = createFloodMessage();
-		sendToAllNeighbours(reply_msg);
+		struct Message reply_msg = CreateFloodMessage();
+		Broadcast(reply_msg);
 	}
 }
 
@@ -841,7 +823,7 @@ void BFS()
 		}
 }
 
-void initNode(){
+void InitNode(){
 	nodeInfo.mySocket = -1;
 	int i;
 	for (i = 0; i < nodeInfo.numNeighbours; i++){
@@ -858,25 +840,24 @@ void initNode(){
 	nodeInfo.status = UNKNOWN;
 }
 
-void startFlood()
+void StartFlood()
 {
-
 	printf("<%s,%s, %d>: Starting FLOOD!\n", __FILE__, __func__, __LINE__);
 
-	struct Message msg = createFloodMessage();
+	struct Message msg = CreateFloodMessage();
 
-	sendToAllNeighbours(msg);
-	printf("<%s,%s, %d>: For UID:%s \tSent message to all neighbours!\n", __FILE__, __func__, __LINE__, nodeInfo.myUID);
+	Broadcast(msg);
+	printf("<%s,%s, %d> Sent Message to All Neighbours!\n", __FILE__, __func__, __LINE__);
 }
 
-void startFloodTerminate(){
+void StartFloodTerminate(){
 
 	struct Message msg = CreateFloodTerminationMessage();
-	sendToAllNeighbours(msg);
-	printf("<%s,%s, %d>: For UID:%s \tsend message to all neighbours!\n", __FILE__, __func__, __LINE__, nodeInfo.myUID);
+	Broadcast(msg);
+	printf("<%s,%s, %d> Sent Message to All Neighbours!\n", __FILE__, __func__, __LINE__);
 }
 
-void printHelp()
+void PrintHelp()
 {
 	printf("Expected:\n\t\tPelegsAlgorithm.o -i <Path/To/Config/File>\n\n");
 }
@@ -891,7 +872,7 @@ int main(int argc, char** argv)
 	{
 		if((0 == strcmp(argv[c],"-h")) || (0 == strcmp(argv[c],"-help")))
 		{
-			printHelp();
+			PrintHelp();
 			exit(1);
 		}
 		else if(0 == strcmp(argv[c],"-i"))
@@ -924,7 +905,7 @@ int main(int argc, char** argv)
 
 	nodeInfo = Parse(machineName,pathToConfig);
 
-	initNode();
+	InitNode();
 
 	PrintNodeInfo(nodeInfo);
 
@@ -985,7 +966,7 @@ int main(int argc, char** argv)
 
 	
 	//Pelegs();
-	startFlood();
+	StartFlood();
 
 	while(UNKNOWN == nodeInfo.status);
 
