@@ -562,19 +562,48 @@ void HandleMessages(void *ni)
 
 void HandleSearchMessage(struct Message msg)
 {
-	
+
+	char srcUID[BUFFER_SIZE];
+	sprintf(srcUID,"%d",msg.srcUID);
+	printf("<%s,%s,%d> Received SEARCH Message from UID %s!",__FILE__,__func__,__LINE__,srcUID);
+
 	if(1 == nodeInfo.marked)
 	{
-		//check if we already sent search messages to all neighbours
-		int i = 0;
+		printf("<%s,%s,%d> Already Marked For Parent UID %s!",__FILE__,__func__,__LINE__,nodeInfo.parentUID);
+
+		//determine socket to send NACK message back to base on recv_msg srcUID
+		int i,socketIndex;
+
 		for(i = 0; i < nodeInfo.numNeighbours; i++)
 		{
+			if(0 == strcmp(nodeInfo.neighbourUIDs[i],srcUID))
+			{
+				socketIndex = i;
+				break;
+			}
+			else
+			{
+				//do nothing
+			}
+		}
 
+		//check if we already sent search messages to all neighbours
+		struct Message msg = CreateNACKMessage();
+		int error_code = send(nodeInfo.neighbourSockets[socketIndex],&msg,sizeof(msg),0);
+		if(error_code < 0)
+		{
+			printf("<%s,%s,%d> Failed to Send NACK Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[socketIndex],nodeInfo.neighbourSockets[socketIndex]);
+			exit(1);
+		}
+		else
+		{
+			//do nothing- message was sent successfully
+			printf("<%s,%s,%d> Successfully Sent NACK Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[socketIndex],nodeInfo.neighbourSockets[socketIndex]);
 		}
 	}
 	else
 	{
-		//mark the first node we recieved a search message from as parent
+		//mark the first node we received a search message from as parent
 		nodeInfo.marked = 1;
 		char parentUID[10];
 		sprintf(parentUID,"%d",msg.srcUID);
@@ -754,11 +783,13 @@ void BFS()
 			int error_code = send(nodeInfo.neighbourSockets[i],&msg,sizeof(msg),0);
 			if(error_code < 0)
 			{
-
+				printf("<%s,%s,%d> Failed to Send SEARCH Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
+				exit(1);
 			}
 			else
 			{
 				//do nothing- message was sent successfully
+				printf("<%s,%s,%d> Successfully Sent SEARCH Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
 			}
 		}
 }
