@@ -35,6 +35,7 @@ struct Node
     enum LeaderStatus status;
     int neighbourRepliedToSearch[MAX_NEIGHBOURS];
     int degree;
+    int isBFSCompleted;
 };
 
 void PrintNodeInfo(struct Node nodeInfo);

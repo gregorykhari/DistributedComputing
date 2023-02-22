@@ -26,6 +26,8 @@
 
 static struct Node nodeInfo;
 static bool isSync = false;
+static const char* msgType_str[] = {"CONNECTION", "FLOOD", "FLOOD_TERMINATE", "SEARCH", "ACK", "NACK", "CLOSE"};
+
 
 void printHelp();
 int ValidatePort(int);
@@ -37,6 +39,7 @@ int CreateSocket(int port);
 void ConnectToNeighbours();
 void AcceptConnections();
 void CloseConnections();
+void CloseConnection(int idx);
 
 void HandleMessages(void *);
 
@@ -132,16 +135,6 @@ struct Message createFloodMessage(){
 	msg.currDist = nodeInfo.currDistToNode;
 	msg.currMaxDist = nodeInfo.maxDist;
 	msg.msgT = FLOOD;
-	return msg;
-}
-
-struct Message createFTM(){
-	struct Message msg;
-	msg.srcUID = atoi(nodeInfo.myUID);
-	msg.currMaxUID = nodeInfo.maxUIDSeen;
-	msg.currDist = nodeInfo.currDistToNode;
-	msg.currMaxDist = nodeInfo.maxDist;
-	msg.msgT = FLOOD_TERMINATE;
 	return msg;
 }
 
@@ -252,7 +245,9 @@ void sendToAllNeighbours(struct Message msg)
 	int i;
 	for( i = 0; i < nodeInfo.numNeighbours; i++){
 		msg.dstUID = atoi(nodeInfo.neighbourUIDs[i]);
-		int error_code = send(nodeInfo.neighbourSockets[i],&msg,sizeof(msg),0);
+		printf("<%s,%s, %d>: Sending message type %d to Neighbour with UID %d on socket %d!\n", __FILE__, __func__, __LINE__, msg.msgT,msg.dstUID,nodeInfo.neighbourSockets[i]);
+		
+		int error_code = send(nodeInfo.neighbourSockets[i], &msg, sizeof(msg),0);
 		if(error_code < 0)
 		{
 			printf("<%s,%s, %d>: Failed to send messages to neighbours: Error Code%d\n", __FILE__, __func__, __LINE__, error_code);
@@ -261,6 +256,8 @@ void sendToAllNeighbours(struct Message msg)
 		else
 		{
 			//do nothing- message was sent successfully
+			printf("<%s,%s, %d>: Successfully sent messages to neighbour %d: On socket:%d\n", __FILE__, __func__, __LINE__, msg.dstUID, nodeInfo.neighbourSockets[i]);
+
 		}
 	}
 }
@@ -523,26 +520,20 @@ void HandleMessages(void *ni)
 {
 	int neighbourIndex = *((int*)ni);
 
-	printf("<%s,%s,%d> Checkpoint\n",__FILE__,__func__,__LINE__);
-	printf("<%s,%s,%d> Neighbour Index: %d\n",__FILE__,__func__,__LINE__, neighbourIndex);
-
-	printf("<%s,%s,%d> In HandleMessage for Socket %d",__FILE__,__func__,__LINE__,nodeInfo.neighbourSockets[neighbourIndex]);
-
 	char recv_buffer[BUFFER_SIZE];
+
+	memset(recv_buffer,'\0',sizeof(recv_buffer));
 	int error_code = recv(nodeInfo.neighbourSockets[neighbourIndex], &recv_buffer,sizeof(recv_buffer),0);
+	struct Message recv_msg = *((struct Message *)recv_buffer);
 	if (error_code < 0) 
 	{                                                              
 		printf("<%s,%s,%d> Failed to receive message!\t %d\n",__FILE__,__func__,__LINE__,error_code);
-		exit(1);                                                                  
+		return;                                                                
 	}
 	else
 	{
-		//do nothing 
+		printf("<%s,%s,%d> Successfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],nodeInfo.neighbourSockets[neighbourIndex]);
 	}
-	
-	struct Message recv_msg = *((struct Message *)recv);
-
-	//printf("<%s,%s,%d> In HandleMessage Thread for Node Socket %d\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourSockets[neighbourIndex]);
 
 	while(1)
 	{
@@ -551,54 +542,55 @@ void HandleMessages(void *ni)
 		switch (recv_msg.msgT)
 		{
 			case CONNECTION:
-				printf("<%s,%s, %d>: Message Type: CONNECTION\n", __FILE__, __func__, __LINE__);
 				printf("Synchronized:- %d\n", isSynchronized());
 				break;
 			
 			case FLOOD:
-				printf("<%s,%s, %d>: Message Type: FLOOD\n", __FILE__, __func__, __LINE__);
 				PelegsAlgorithm(recv_msg);
 				break;
 
 			case FLOOD_TERMINATE:
-				printf("<%s,%s, %d>: Message Type: FLOOD_TERMINATE\n", __FILE__, __func__, __LINE__);
 				if(nodeInfo.status == UNKNOWN){
 					nodeInfo.status = NON_LEADER;
 					struct Message reply_msg = CreateFloodTerminationMessage();
+					printf("<%s,%s, %d>: FLOOD TERMINATE: Sending to all neighbours\n", __FILE__, __func__, __LINE__);	
 					sendToAllNeighbours(reply_msg);
 				}
 				break;
 
 			case SEARCH:
-				printf("<%s,%s, %d>: Message Type: SEARCH\n", __FILE__, __func__, __LINE__);
 				HandleSearchMessage(recv_msg);
 				break;
 
 			case ACK:
-				printf("<%s,%s, %d>: Message Type: ACK\n", __FILE__, __func__, __LINE__);
 				HandleACKMessage(recv_msg);
 				break;
 
 			case NACK:
-				printf("<%s,%s, %d>: Message Type: NACK\n", __FILE__, __func__, __LINE__);
 				HandleNACKMessage(recv_msg);
+				break;
+			
+			case CLOSE:
+				CloseConnection(neighbourIndex);
+				return;
 				break;
 
 			default:
-				printf("<%s,%s, %d>: Message Type: CONNECTION\n", __FILE__, __func__, __LINE__);
+				printf("<%s,%s, %d>: Message Type:\t  Type:%d Src: %d \t Received:%d\n\n", __FILE__, __func__, __LINE__, recv_msg.msgT, recv_msg.srcUID, recv_msg.dstUID);
 		}
 
-		printf("<%s,%s, %d>: Waiting for message!\n", __FILE__, __func__, __LINE__);
-		error_code = recv(nodeInfo.neighbourSockets[neighbourIndex], &recv_buffer,sizeof(recv_buffer),0);
-		if (error_code < 0) {                                                              
-			printf("<%s,%s,%d> Failed to receive message!\t %d\n",__FILE__,__func__,__LINE__,error_code);
+		memset(recv_buffer,'\0',sizeof(recv_buffer));
+		int error_code = recv(nodeInfo.neighbourSockets[neighbourIndex], &recv_buffer,sizeof(recv_buffer),0);
+		recv_msg = *((struct Message *)recv_buffer);
+		if (error_code < 0) 
+		{                                                              
+			printf("<%s,%s,%d> Failed To Receive Message From Neighbour with UID %s On Socket %d!\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[neighbourIndex],nodeInfo.neighbourSockets[neighbourIndex]);
 			exit(1);                                                                  
-		} 
+		}
 		else
 		{
-			//do nothing
+			printf("<%s,%s,%d> Successfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],nodeInfo.neighbourSockets[neighbourIndex]);
 		}
-		recv_msg = *((struct Message *)recv);
 	}
 }
 
@@ -774,11 +766,20 @@ bool isSynchronized(){
 void CloseConnections()
 {
 	int i = 0;
+	struct Message closeConnectionMsg = createConnectionMessage();
+	closeConnectionMsg.msgT = CLOSE;
+	sendToAllNeighbours(closeConnectionMsg);
 	for(i = 0; i < nodeInfo.numNeighbours; i++)
 	{
 		close(nodeInfo.neighbourSockets[i]);
 		printf("<%s,%s,%d> Successfully Closed Connections to Neighbour with UID %s",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[i]);
 	}
+}
+
+void CloseConnection(int index)
+{
+	close(nodeInfo.neighbourSockets[index]);
+	printf("<%s,%s,%d> Successfully Closed Connections to Neighbour with UID %s",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[index]);
 }
 
 void PelegsAlgorithm(struct Message msg)
@@ -789,7 +790,7 @@ void PelegsAlgorithm(struct Message msg)
 	
 	if(nodeInfo.currLeaderCount > 3 && nodeInfo.maxUIDSeen == msg.currMaxUID){
 		//Start a flood terminate message!
-		printf("<%s,%s, %d>: Start the flood!\n", __FILE__, __func__, __LINE__);
+		printf("<%s,%s, %d>: Start the flood Terminate!\n", __FILE__, __func__, __LINE__);
 		nodeInfo.status = LEADER;
 		startFloodTerminate();
 	}
@@ -798,13 +799,14 @@ void PelegsAlgorithm(struct Message msg)
 			printf("<%s,%s, %d>: Received Message with larger UID\t Need to update!\n", __FILE__, __func__, __LINE__);
 			nodeInfo.maxUIDSeen = msg.currMaxUID;
 			nodeInfo.currDistToNode = msg.currDist + 1;
-			nodeInfo.maxDist = nodeInfo.maxDist;
+			nodeInfo.maxDist = nodeInfo.currDistToNode;
 			nodeInfo.currLeaderCount = 1;
 		}
 		else if(nodeInfo.maxUIDSeen == msg.currMaxUID){
-			printf("<%s,%s, %d>: Received Message with the same UID\t Setting the max\n", __FILE__, __func__, __LINE__);
+			printf("<%s,%s, %d>: Received Message with the same UID\t Setting the max distance\n", __FILE__, __func__, __LINE__);
 			if(msg.currMaxDist > nodeInfo.maxDist)
 				nodeInfo.maxDist = msg.currMaxDist;
+			printf("<%s,%s, %d>: RECV Same UID\t maxDistance: %d\n", __FILE__, __func__, __LINE__, nodeInfo.maxDist);
 		}
 		struct Message reply_msg = createFloodMessage();
 		sendToAllNeighbours(reply_msg);
@@ -864,7 +866,7 @@ void startFlood()
 	struct Message msg = createFloodMessage();
 
 	sendToAllNeighbours(msg);
-	printf("<%s,%s, %d>: For UID:%s \tsend message to all neighbours!\n", __FILE__, __func__, __LINE__, nodeInfo.myUID);
+	printf("<%s,%s, %d>: For UID:%s \tSent message to all neighbours!\n", __FILE__, __func__, __LINE__, nodeInfo.myUID);
 }
 
 void startFloodTerminate(){
@@ -978,10 +980,9 @@ int main(int argc, char** argv)
 	pthread_join(acceptConnections_tid,NULL);
 
 
-	while(0 == allConnectionsEstablished())
-	{
-		printf("<%s,%s,%d> Waiting for All Connections to Be Established...\n",__FILE__,__func__,__LINE__);
-	};
+	printf("<%s,%s,%d> Waiting for All Connections to Be Established...\n",__FILE__,__func__,__LINE__);
+	sleep(5);
+
 	
 	//Pelegs();
 	startFlood();
@@ -990,7 +991,9 @@ int main(int argc, char** argv)
 
 	if(LEADER == nodeInfo.status)
 	{
+		sleep(10);
 		BFS();
+
 	}
 	else
 	{
@@ -998,6 +1001,10 @@ int main(int argc, char** argv)
 	}
 
 	PrintNodeBFSInfo(nodeInfo);
+
+	sleep(10);
+
+	CloseConnections();
 
 	return 0;
 }
