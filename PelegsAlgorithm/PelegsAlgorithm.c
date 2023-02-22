@@ -532,7 +532,7 @@ void HandleMessages(void *ni)
 	}
 	else
 	{
-		printf("<%s,%s,%d> Successfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],nodeInfo.neighbourSockets[neighbourIndex]);
+		printf("<%s,%s,%d> Successfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.dstUID,nodeInfo.neighbourSockets[neighbourIndex]);
 	}
 
 	while(1)
@@ -589,7 +589,7 @@ void HandleMessages(void *ni)
 		}
 		else
 		{
-			printf("<%s,%s,%d> Successfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],nodeInfo.neighbourSockets[neighbourIndex]);
+			printf("<%s,%s,%d> Successfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.dstUID,nodeInfo.neighbourSockets[neighbourIndex]);
 		}
 	}
 }
