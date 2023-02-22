@@ -59,6 +59,10 @@ void BFS();
 
 bool isSynchronized();
 
+void startFlood();
+void startFloodTerminate();
+void sendToAllNeighbours(struct Message msg);
+
 //checks if port number is within valid range 
 int ValidatePort(int port)
 {
@@ -227,6 +231,21 @@ int CreateSocket(int port)
 }
 
 //connects to randomly selected server with information returned by ConnectToServer
+void sendToAllNeighbours(struct Message msg){
+	for(int i = 0; i < nodeInfo.numNeighbours; i++){
+		msg.dstUID = atoi(nodeInfo.neighbourUIDs[i]);
+		int error_code = send(nodeInfo.neighbourSockets[i],&msg,sizeof(msg),0);
+		if(error_code < 0)
+		{
+			printf("<%s,%s, %d>: Failed to send messages to neighbours: Error Code%d\n", __FILE__, __func__, __LINE__, error_code);
+			exit(1);
+		}
+		else
+		{
+			//do nothing- message was sent successfully
+		}
+	}
+}
 void ConnectToNeighbours()
 {
 	char send_buffer[BUFFER_SIZE];
@@ -525,6 +544,11 @@ void HandleMessages(void *ni)
 
 			case FLOOD_TERMINATE:
 				printf("<%s,%s, %d>: Message Type: FLOOD_TERMINATE\n", __FILE__, __func__, __LINE__);
+				if(nodeInfo.status == UNKNOWN){
+					nodeInfo.status = NON_LEADER;
+					struct Message reply_msg = CreateFloodTerminationMessage();
+					sendToAllNeighbours(reply_msg);
+				}
 				break;
 
 			case SEARCH:
@@ -744,11 +768,12 @@ void PelegsAlgorithm(struct Message msg)
 	if(nodeInfo.maxUIDSeen == msg.currMaxUID){
 		nodeInfo.currLeaderCount++;
 	}
-	struct Message reply_msg;
-	if(nodeInfo.currLeaderCount > 3){
+	
+	if(nodeInfo.currLeaderCount > 3 && nodeInfo.maxUIDSeen == msg.currMaxUID){
 		//Start a flood terminate message!
 		printf("<%s,%s, %d>: Start the flood!\n", __FILE__, __func__, __LINE__);
-		reply_msg = CreateFloodTerminationMessage();
+		nodeInfo.status = LEADER;
+		startFloodTerminate();
 	}
 	else{
 		if(nodeInfo.maxUIDSeen < msg.currMaxUID){
@@ -763,6 +788,8 @@ void PelegsAlgorithm(struct Message msg)
 			if(msg.currMaxDist > nodeInfo.maxDist)
 				nodeInfo.maxDist = msg.currMaxDist;
 		}
+		struct Message reply_msg = createFloodMessage();
+		sendToAllNeighbours(reply_msg);
 	}
 }
 
@@ -808,6 +835,22 @@ void initNode(){
 	nodeInfo.maxDist = 0;
 	nodeInfo.currDistToNode = 0;
 	nodeInfo.currLeaderCount= 1;
+	nodeInfo.status = UNKNOWN;
+}
+
+void startFlood(){
+
+	struct Message msg = createFloodMessage();
+
+	sendToAllNeighbours(msg);
+	printf("<%s,%s, %d>: For UID:%s \tsend message to all neighbours!\n", __FILE__, __func__, __LINE__, nodeInfo.myUID);
+}
+
+void startFloodTerminate(){
+
+	struct Message msg = CreateFloodTerminationMessage();
+	sendToAllNeighbours(msg);
+	printf("<%s,%s, %d>: For UID:%s \tsend message to all neighbours!\n", __FILE__, __func__, __LINE__, nodeInfo.myUID);
 }
 
 void printHelp()
@@ -898,9 +941,10 @@ int main(int argc, char** argv)
 	pthread_join(connectToNodes_tid,NULL);
 	pthread_join(acceptConnections_tid,NULL);
 
-	//while(0 == establishedAllConnections());
+	while(0 == isSynchronized());
 	
 	//Pelegs();
+	startFlood();
 
 	while(UNKNOWN == nodeInfo.status);
 
