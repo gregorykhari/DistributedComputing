@@ -860,7 +860,7 @@ void BFS()
 			else
 			{
 				//do nothing- message was sent successfully
-				printf("<%s,%s,%d>\tSuccessfully Sent Round %d %s Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,msg.round,msgType_str[msg.msgT]nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
+				printf("<%s,%s,%d>\tSuccessfully Sent Round %d %s Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,msg.round,msgType_str[msg.msgT],nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
 			}
 		}
 }
