@@ -19,6 +19,7 @@ struct Node
     char myListeningPort[CHAR_BUFFER_SIZE];
     int mySocket;
     int numNeighbours;
+    int numConnections;
 	char neighbourHostNames[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE];
 	char neighbourListeningPorts[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE];
     char neighbourUIDs[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE];
