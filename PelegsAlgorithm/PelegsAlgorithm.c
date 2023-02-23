@@ -28,6 +28,7 @@ static struct Node nodeInfo;
 static bool isSync = false;
 static const char* msgType_str[] = {"CONNECTION", "FLOOD", "FLOOD_TERMINATE", "SEARCH", "ACK", "NACK", "CLOSE"};
 
+void InitNode(char*,char*);
 
 void PrintHelp();
 int ValidatePort(int);
@@ -71,17 +72,7 @@ void Broadcast(struct Message msg);
 
 int allConnectionsEstablished()
 {
-	int flag = 1;
-	int i;
-	for(i = 0 ; i < nodeInfo.numNeighbours; i++)
-	{
-		if(nodeInfo.neighbourSockets[i] == -1)
-		{
-			flag = 0;
-			break;
-		}
-	}
-	return flag;
+	return (nodeInfo.numConnections >= nodeInfo.numNeighbours);
 }
 
 //checks if port number is within valid range 
@@ -132,6 +123,7 @@ struct Message CreateConnectionMessage()
 
 struct Message CreateFloodMessage(){
 	struct Message msg;
+	msg.round = nodeInfo.maxRound + 1;
 	msg.srcUID = atoi(nodeInfo.myUID);
 	msg.currMaxUID = nodeInfo.maxUIDSeen;
 	msg.currDist = nodeInfo.currDistToNode;
@@ -197,7 +189,7 @@ int ResolveHostnameToIP(char * hostname , char* ip)
 	if ((he = gethostbyname( hostname )) == NULL) 
 	{
 		// get the host info
-		printf("<%s,%s,%d> Failed to Get Host Address List!",__FILE__,__func__,__LINE__);
+		printf("<%s,%s,%d>\tFailed to Get Host Address List!",__FILE__,__func__,__LINE__);
 		return 1;
 	}
 
@@ -224,24 +216,24 @@ int CreateSocket(int port)
 	int node_socket = socket(AF_INET,SOCK_STREAM,0);
 	if (node_socket < 0)
 	{
-		printf("<%s,%s,%d>  Failed to create socket - error: %s!\n",__FILE__,__func__,__LINE__,strerror(errno));
+		printf("<%s,%s,%d>\t Failed to create socket - error: %s!\n",__FILE__,__func__,__LINE__,strerror(errno));
 		return -1;
 	}
 	else
 	{
-		printf("<%s,%s,%d>  Successfully created socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
+		printf("<%s,%s,%d>\t Successfully created socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
 	}
 
 	//assign server (IP) address to server socket
 	int error_code = bind(node_socket,(struct sockaddr *) &server_addr,sizeof(server_addr));
 	if (error_code != 0)
 	{
-		printf("<%s,%s,%d>  Failed to bind socket - error: %s, error_code: %d!\n",__FILE__,__func__,__LINE__,strerror(errno),error_code);
+		printf("<%s,%s,%d>\t Failed to bind socket - error: %s, error_code: %d!\n",__FILE__,__func__,__LINE__,strerror(errno),error_code);
 		return -1;
 	}
 	else
 	{
-		printf("<%s,%s,%d>  Successfully binded socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
+		printf("<%s,%s,%d>\t Successfully binded socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
 	}
 
     return node_socket;
@@ -253,22 +245,21 @@ void Broadcast(struct Message msg)
 	int i;
 	for( i = 0; i < nodeInfo.numNeighbours; i++){
 		msg.dstUID = atoi(nodeInfo.neighbourUIDs[i]);
-		printf("<%s,%s, %d>: Sending message type %d to Neighbour with UID %d on socket %d!\n", __FILE__, __func__, __LINE__, msg.msgT,msg.dstUID,nodeInfo.neighbourSockets[i]);
+		printf("<%s,%s, %d>\tSending Round %d %s Message to Neighbour with UID %d on Socket %d!\n", __FILE__, __func__, __LINE__, msg.round, msgType_str[msg.msgT],msg.dstUID,nodeInfo.neighbourSockets[i]);
 		
 		int error_code = send(nodeInfo.neighbourSockets[i], &msg, sizeof(msg),0);
 		if(error_code < 0)
 		{
-			printf("<%s,%s, %d>: Failed to send messages to neighbours: Error Code%d\n", __FILE__, __func__, __LINE__, error_code);
+			printf("<%s,%s, %d>\tFailed to Send Round %d %s Message to Neighbour With UID %s On Socket %s! Error_Code: %d\n", __FILE__, __func__, __LINE__,msg.round, msgType_str[msg.msgT],nodeInfo.neighbourUIDs[i], nodeInfo.neighbourSockets[i],error_code);
 			exit(1);
 		}
 		else
 		{
-			//do nothing- message was sent successfully
-			printf("<%s,%s, %d>: Successfully sent messages to neighbour %d: On socket:%d\n", __FILE__, __func__, __LINE__, msg.dstUID, nodeInfo.neighbourSockets[i]);
-
+			printf("<%s,%s, %d>\tSuccessfully Sent Round %d %s Message to Neighbour With UID %d On Socket %d\n", __FILE__, __func__, __LINE__, msg.round, msgType_str[msg.msgT],msg.dstUID, nodeInfo.neighbourSockets[i]);
 		}
 	}
 }
+
 void ConnectToNeighbours()
 {
 	char send_buffer[BUFFER_SIZE];
@@ -287,7 +278,7 @@ void ConnectToNeighbours()
 		char* hostname = nodeInfo.neighbourHostNames[node_socket_index];
 		if(1 == ResolveHostnameToIP(hostname,ipAddr))
 		{
-			printf("<%s,%s,%d> Failed to Resolve Hostname %s to IPAddress!",__FILE__,__func__,__LINE__,hostname);
+			printf("<%s,%s,%d>\tFailed to Resolve Hostname %s to IPAddress!",__FILE__,__func__,__LINE__,hostname);
 		}
 		else
 		{
@@ -298,19 +289,19 @@ void ConnectToNeighbours()
 
 		if(0 == ValidateIPAddress(ipAddr))
 		{
-			printf("<%s,%s,%d> IP Adress %s is not in expected format of X.X.X.X !\n",__FILE__,__func__,__LINE__,ipAddr);
-			printf("<%s,%s,%d> Failed to Connect to Node!",__FILE__,__func__,__LINE__);
+			printf("<%s,%s,%d>\tIP Adress %s is not in expected format of X.X.X.X !\n",__FILE__,__func__,__LINE__,ipAddr);
+			printf("<%s,%s,%d>\tFailed to Connect to Node!",__FILE__,__func__,__LINE__);
 			exit(1);
 		}
 
 		if(0 == ValidatePort(port))
 		{
-			printf("<%s,%s,%d> Port %d not within valid range of 1024 to 65535!\n",__FILE__,__func__,__LINE__,port);
-			printf("<%s,%s,%d> Failed to Connect to Node!",__FILE__,__func__,__LINE__);
+			printf("<%s,%s,%d>\tPort %d not within valid range of 1024 to 65535!\n",__FILE__,__func__,__LINE__,port);
+			printf("<%s,%s,%d>\tFailed to Connect to Node!",__FILE__,__func__,__LINE__);
 			exit(1);
 		}
 
-		printf("<%s,%s,%d> Attempting to Connect to IP Adress %s on Port %d!\n",__FILE__,__func__,__LINE__,ipAddr,port);
+		printf("<%s,%s,%d>\tAttempting to Connect to IP Adress %s on Port %d!\n",__FILE__,__func__,__LINE__,ipAddr,port);
 
 		struct sockaddr_in server_addr;
 		server_addr.sin_family = AF_INET; //specified for IPv4 connection
@@ -324,7 +315,7 @@ void ConnectToNeighbours()
 			nodeInfo.neighbourSockets[node_socket_index] = socket(AF_INET,SOCK_STREAM,0);
 			if (nodeInfo.neighbourSockets[node_socket_index] < 0)
 			{
-				printf("<%s,%s,%d> Failed to create socket! Error_code: %d .Error: %s!\n",__FILE__,__func__,__LINE__,error_code,strerror(errno));
+				printf("<%s,%s,%d>\tFailed to create socket! Error_code: %d .Error: %s!\n",__FILE__,__func__,__LINE__,error_code,strerror(errno));
 			}
 			
 			error_code = connect(nodeInfo.neighbourSockets[node_socket_index],(struct sockaddr *)&server_addr,sizeof(server_addr));
@@ -334,7 +325,7 @@ void ConnectToNeighbours()
 			}
 			else
 			{
-				printf("<%s,%s,%d> Successfully Established Connection to Neighbour with UID %s on Port %d With Socket %d!\n",__FILE__,__func__,__LINE__,ipAddr,port,nodeInfo.neighbourSockets[node_socket_index]);
+				printf("<%s,%s,%d>\tSuccessfully Established Connection to Neighbour with UID %s on Port %d With Socket %d!\n",__FILE__,__func__,__LINE__,ipAddr,port,nodeInfo.neighbourSockets[node_socket_index]);
 				break;
 			}
 		}
@@ -344,7 +335,7 @@ void ConnectToNeighbours()
 		error_code = send(nodeInfo.neighbourSockets[node_socket_index], &msg, sizeof(msg),0);
 		if (error_code < 0)
 		{
-			printf("<%s,%s,%d> Error Sending Message (%s) to Server on Socket %d - error: %s!\n",__FILE__,__func__,__LINE__,send_buffer,nodeInfo.neighbourSockets[node_socket_index],strerror(errno));
+			printf("<%s,%s,%d>\tError Sending Message (%s) to Server on Socket %d - error: %s!\n",__FILE__,__func__,__LINE__,send_buffer,nodeInfo.neighbourSockets[node_socket_index],strerror(errno));
 		}
 		else
 		{
@@ -355,7 +346,7 @@ void ConnectToNeighbours()
 		int* nsi = malloc(sizeof(int));
 		if(NULL == nsi)
 		{
-			printf("<%s,%s,%d> Failed to malloc for nsi!\n",__FILE__,__func__,__LINE__);
+			printf("<%s,%s,%d>\tFailed to malloc for nsi!\n",__FILE__,__func__,__LINE__);
 		}
 		else
 		{
@@ -368,14 +359,14 @@ void ConnectToNeighbours()
 
 		error_code = pthread_attr_init(&attr);                                               
 		if (error_code == -1) {                                                              
-			printf("<%s,%s,%d> Failed to create HandleMessages thread for Client at socket %d - error: %d\n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[node_socket_index]);
+			printf("<%s,%s,%d>\tFailed to create HandleMessages thread for Client at socket %d - error: %d\n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[node_socket_index]);
 			exit(1);                                                                  
 		}                                                                            
 
 		int ds = PTHREAD_CREATE_DETACHED;                                                                      
 		error_code = pthread_attr_setdetachstate(&attr, ds);                                
 		if (error_code == -1) {                                                              
-			printf("<%s,%s,%d> Failed to create HandleMessages thread for Client at socket %d - error: %d\n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[node_socket_index]);
+			printf("<%s,%s,%d>\tFailed to create HandleMessages thread for Client at socket %d - error: %d\n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[node_socket_index]);
 			exit(1);                                                                  
 		}     
 
@@ -383,13 +374,16 @@ void ConnectToNeighbours()
 		error_code = pthread_create(&nodeInfo.neighbourThreads[node_socket_index],&attr,(void *)HandleMessages,nsi);
 		if(error_code != 0)
 		{
-			printf("<%s,%s,%d> Failed to create HandleServer thread for Client at socket %d - error: %d\n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[node_socket_index]);
+			printf("<%s,%s,%d>\tFailed to create HandleServer thread for Client at socket %d - error: %d\n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[node_socket_index]);
 			exit(1);
 		}
 		else
 		{
 			//do nothing
 		}
+
+		//increment the number of connections
+		nodeInfo.numConnections = nodeInfo.numConnections + 1;
 	}
 }
 
@@ -401,12 +395,12 @@ void AcceptConnections()
 	int error_code = listen(nodeInfo.mySocket,1);
 	if (error_code != 0)
 	{
-		printf("<%s,%s,%d> Failed to initiate listening on socket - error: %s!\n",__FILE__,__func__,__LINE__,strerror(errno));
+		printf("<%s,%s,%d>\tFailed to initiate listening on socket - error: %s!\n",__FILE__,__func__,__LINE__,strerror(errno));
 		exit(1);
 	}
 	else
 	{
-		printf("<%s,%s,%d> Successfully initiated listening on socket %d!\n",__FILE__,__func__,__LINE__,nodeInfo.mySocket);
+		printf("<%s,%s,%d>\tSuccessfully initiated listening on socket %d!\n",__FILE__,__func__,__LINE__,nodeInfo.mySocket);
 	}
 
 	while(1)
@@ -417,13 +411,13 @@ void AcceptConnections()
 		int node_socket = accept(nodeInfo.mySocket,NULL,NULL);
 		if (node_socket < 0)
 		{
-			printf("<%s,%s,%d> Failed to accept incoming connection from client - error: %s!\n",__FILE__,__func__,__LINE__,strerror(errno));
+			printf("<%s,%s,%d>\tFailed to Accept Incoming Connection from client - error: %s!\n",__FILE__,__func__,__LINE__,strerror(errno));
 			exit(1);
 		}
 		else
 		{
 			//do nothing
-			printf("<%s,%s,%d> Successfully established connection with client at socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
+			printf("<%s,%s,%d>\tSuccessfully Accepted Incoming Connection with Neighbour at socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
 		}
 
 		memset(recv_buffer,'\0',sizeof(recv_buffer));
@@ -431,12 +425,12 @@ void AcceptConnections()
 		struct Message recv_msg = *((struct Message *)recv_buffer);
 		if (error_code < 0) 
 		{                                                              
-			printf("<%s,%s,%d> Error while receiving message from Neighbour at Socket %d. Error %d : %s!\n",__FILE__,__func__,__LINE__,node_socket,error_code,strerror(errno));
+			printf("<%s,%s,%d>\tError While Receiving Message from Neighbour at Socket %d! Error %d : %s!\n",__FILE__,__func__,__LINE__,node_socket,error_code,strerror(errno));
 			return;                                                              
 		}
 		else
 		{
-			printf("<%s,%s,%d> Successfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.dstUID,node_socket);
+			printf("<%s,%s,%d>\tReceived %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.srcUID,node_socket);
 		}
 
 		//determine index of node based on srcUID of CONNECTION message just received
@@ -445,34 +439,35 @@ void AcceptConnections()
 		int neighbourIndex = getNeighbourIndex(node_uid);
 		nodeInfo.neighbourSockets[neighbourIndex] = node_socket;
 
-		printf("<%s,%s,%d> Successfully Established Connection at Socket = %d\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourSockets[neighbourIndex]);
+		printf("<%s,%s,%d>\tSuccessfully Established Connection With Neighbour %s on Socket %d\n",__FILE__,__func__,__LINE__,node_uid,nodeInfo.neighbourSockets[neighbourIndex]);
 
 		//create a variable to pass network socket to thread args
 		int* ni = malloc(sizeof(int));
 		if(NULL == ni)
 		{
-			printf("<%s,%s,%d> Failed to malloc for nsi for socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
+			printf("<%s,%s,%d>\tFailed to malloc for nsi for socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
+			exit(1);
 		}
 		else
 		{
-				//do nothing
+			//do nothing
+			*ni = neighbourIndex;
 		}
 
-		*ni = neighbourIndex;
+		
 
-		printf("<%s,%s,%d> Neighbour Indexes :%d\t :%d\n",__FILE__,__func__,__LINE__, neighbourIndex,*ni);
 		pthread_attr_t attr;                                                                                                                
 
 		error_code = pthread_attr_init(&attr);                                               
 		if (error_code == -1) {                                                              
-			printf("<%s,%s,%d> Failed to create HandleMessages thread for Client at socket %d! Error_code: %d, Error: %s \n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[neighbourIndex],strerror(errno));
+			printf("<%s,%s,%d>\tFailed to create HandleMessages thread for Client at socket %d! Error_code: %d, Error: %s \n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[neighbourIndex],strerror(errno));
 			exit(1);                                                                  
 		}                                                                            
 
 		int ds = PTHREAD_CREATE_DETACHED;                                                                      
 		error_code = pthread_attr_setdetachstate(&attr, ds);                                
 		if (error_code == -1) {                                                              
-			printf("<%s,%s,%d> Failed to create HandleMessages thread for Client at socket %d! Error_code: %d, Error: %s \n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[neighbourIndex],strerror(errno));
+			printf("<%s,%s,%d>\tFailed to create HandleMessages thread for Client at socket %d! Error_code: %d, Error: %s \n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[neighbourIndex],strerror(errno));
 			exit(1);                                                                  
 		}     
 
@@ -480,7 +475,7 @@ void AcceptConnections()
 		error_code = pthread_create(&nodeInfo.neighbourThreads[neighbourIndex],&attr,(void *)HandleMessages,ni);
 		if(error_code != 0)
 		{
-			printf("<%s,%s,%d> Failed to create HandleServer thread for Client at socket %d! Error_code: %d, Error: %s \n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[neighbourIndex],strerror(errno));
+			printf("<%s,%s,%d>\tFailed to create HandleServer thread for Client at socket %d! Error_code: %d, Error: %s \n",__FILE__,__func__,__LINE__,error_code,nodeInfo.neighbourSockets[neighbourIndex],strerror(errno));
 			exit(1);
 		}
 		else
@@ -488,6 +483,7 @@ void AcceptConnections()
 			//do nothing
 		}
 
+		nodeInfo.numConnections = nodeInfo.numConnections + 1;
 	}
 }
 
@@ -502,22 +498,26 @@ void HandleMessages(void *ni)
 	struct Message recv_msg = *((struct Message *)recv_buffer);
 	if (error_code < 0) 
 	{                                                              
-		printf("<%s,%s,%d> Failed to receive message!\t %d\n",__FILE__,__func__,__LINE__,error_code);
+		printf("<%s,%s,%d>\tFailed to receive message!\t %d\n",__FILE__,__func__,__LINE__,error_code);
 		return;                                                                
 	}
 	else
 	{
-		printf("<%s,%s,%d> Successfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.dstUID,nodeInfo.neighbourSockets[neighbourIndex]);
+		printf("<%s,%s,%d>\tSuccessfully Received Round %d %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,recv_msg.round,msgType_str[recv_msg.msgT],recv_msg.dstUID,nodeInfo.neighbourSockets[neighbourIndex]);
 	}
 
 	while(1)
 	{
+		//determine round for which message was sent
+		if(nodeInfo.maxRoundsInNeighbours[neighbourIndex] < recv_msg.round){
+			nodeInfo.maxRoundsInNeighbours[neighbourIndex] = recv_msg.round;
+		}
+
 		while(0 == isSynchronized());
 		
 		switch (recv_msg.msgT)
 		{
 			case CONNECTION:
-				printf("Synchronized:- %d\n", isSynchronized());
 				break;
 			
 			case FLOOD:
@@ -559,12 +559,12 @@ void HandleMessages(void *ni)
 		recv_msg = *((struct Message *)recv_buffer);
 		if (error_code < 0) 
 		{                                                              
-			printf("<%s,%s,%d> Failed To Receive Message From Neighbour with UID %s On Socket %d!\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[neighbourIndex],nodeInfo.neighbourSockets[neighbourIndex]);
+			printf("<%s,%s,%d>\tFailed To Receive Message From Neighbour with UID %s On Socket %d!\n",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[neighbourIndex],nodeInfo.neighbourSockets[neighbourIndex]);
 			exit(1);                                                                  
 		}
 		else
 		{
-			printf("<%s,%s,%d> Successfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.dstUID,nodeInfo.neighbourSockets[neighbourIndex]);
+			printf("<%s,%s,%d>\tSuccessfully Received %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.dstUID,nodeInfo.neighbourSockets[neighbourIndex]);
 		}
 	}
 }
@@ -574,11 +574,10 @@ void HandleSearchMessage(struct Message msg)
 
 	char srcUID[BUFFER_SIZE];
 	sprintf(srcUID,"%d",msg.srcUID);
-	printf("<%s,%s,%d> Received SEARCH Message from UID %s!",__FILE__,__func__,__LINE__,srcUID);
 
 	if(1 == nodeInfo.marked)
 	{
-		printf("<%s,%s,%d> Already Marked For Parent UID %s!",__FILE__,__func__,__LINE__,nodeInfo.parentUID);
+		printf("<%s,%s,%d>\tAlready Marked For Parent UID %s!",__FILE__,__func__,__LINE__,nodeInfo.parentUID);
 
 		//determine socket to send NACK message back to base on recv_msg srcUID
 		int i,socketIndex;
@@ -601,13 +600,13 @@ void HandleSearchMessage(struct Message msg)
 		int error_code = send(nodeInfo.neighbourSockets[socketIndex],&msg,sizeof(msg),0);
 		if(error_code < 0)
 		{
-			printf("<%s,%s,%d> Failed to Send NACK Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[socketIndex],nodeInfo.neighbourSockets[socketIndex]);
+			printf("<%s,%s,%d>\tFailed to Send NACK Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[socketIndex],nodeInfo.neighbourSockets[socketIndex]);
 			exit(1);
 		}
 		else
 		{
 			//do nothing- message was sent successfully
-			printf("<%s,%s,%d> Successfully Sent NACK Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[socketIndex],nodeInfo.neighbourSockets[socketIndex]);
+			printf("<%s,%s,%d>\tSuccessfully Sent NACK Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[socketIndex],nodeInfo.neighbourSockets[socketIndex]);
 		}
 	}
 	else
@@ -772,27 +771,20 @@ void CloseConnections()
 	for(i = 0; i < nodeInfo.numNeighbours; i++)
 	{
 		close(nodeInfo.neighbourSockets[i]);
-		printf("<%s,%s,%d> Successfully Closed Connections to Neighbour with UID %s",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[i]);
+		printf("<%s,%s,%d>\tSuccessfully Closed Connections to Neighbour with UID %s",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[i]);
 	}
 }
 
 void CloseConnection(int index)
 {
 	close(nodeInfo.neighbourSockets[index]);
-	printf("<%s,%s,%d> Successfully Closed Connections to Neighbour with UID %s",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[index]);
+	printf("<%s,%s,%d>\tSuccessfully Closed Connections to Neighbour with UID %s",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[index]);
 }
 
 void PelegsAlgorithm(struct Message msg)
 {
 	if(nodeInfo.maxUIDSeen == msg.currMaxUID){
 		nodeInfo.currLeaderCount++;
-	}
-	//Update round in the nodeInfo
-	char node_uid[BUFFER_SIZE];
-	sprintf(node_uid, "%d", msg.srcUID);
-	int neighbourIdx = getNeighbourIndex(node_uid);
-	if(nodeInfo.maxRoundsInNeighbours[neighbourIdx] < msg.round){
-		nodeInfo.maxRoundsInNeighbours[neighbourIdx] = msg.round;
 	}
 	
 	if(nodeInfo.currLeaderCount > 3 && nodeInfo.maxUIDSeen == msg.currMaxUID){
@@ -837,18 +829,21 @@ void BFS()
 			int error_code = send(nodeInfo.neighbourSockets[i],&msg,sizeof(msg),0);
 			if(error_code < 0)
 			{
-				printf("<%s,%s,%d> Failed to Send SEARCH Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
+				printf("<%s,%s,%d>\tFailed to Send SEARCH Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
 				exit(1);
 			}
 			else
 			{
 				//do nothing- message was sent successfully
-				printf("<%s,%s,%d> Successfully Sent SEARCH Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
+				printf("<%s,%s,%d>\tSuccessfully Sent SEARCH Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
 			}
 		}
 }
 
-void InitNode(){
+void InitNode(char* machineName, char* pathToConfig)
+{
+	nodeInfo = Parse(machineName,pathToConfig);
+
 	nodeInfo.mySocket = -1;
 	int i;
 	for (i = 0; i < nodeInfo.numNeighbours; i++){
@@ -858,6 +853,7 @@ void InitNode(){
 		strcpy(nodeInfo.childrenUIDs[i],"\0");
 	}
 
+	nodeInfo.numConnections = 0;
 	nodeInfo.maxUIDSeen = atoi(nodeInfo.myUID);
 	nodeInfo.maxDist = 0;
 	nodeInfo.maxRound = 0;
@@ -868,13 +864,13 @@ void InitNode(){
 
 void StartFlood()
 {
-	printf("<%s,%s, %d>: Starting FLOOD!\n", __FILE__, __func__, __LINE__);
+	printf("<%s,%s, %d> Starting FLOOD!\n", __FILE__, __func__, __LINE__);
 
 	struct Message msg = CreateFloodMessage();
 	int currRound = getMaxRoundToStart();
 	msg.round = currRound;
 	Broadcast(msg);
-	printf("<%s,%s, %d> Sent Message to All Neighbours!\n", __FILE__, __func__, __LINE__);
+	printf("<%s,%s, %d>\tSent ROUND %d %s Message to All Neighbours!\n", __FILE__, __func__, __LINE__, msg.round, msgType_str[msg.msgT]);
 }
 
 void StartFloodTerminate(){
@@ -883,7 +879,7 @@ void StartFloodTerminate(){
 	int currRound = getMaxRoundToStart();
 	msg.round = currRound;
 	Broadcast(msg);
-	printf("<%s,%s, %d> Sent Message to All Neighbours!\n", __FILE__, __func__, __LINE__);
+	printf("<%s,%s, %d>\tSent ROUND %d %s Message to All Neighbours!\n", __FILE__, __func__, __LINE__, msg.round, msgType_str[msg.msgT]);
 }
 
 void PrintHelp()
@@ -915,7 +911,7 @@ int main(int argc, char** argv)
 		}
 	}
 
-	printf("<%s,%s,%d> Retrieving Machine Hostname...\n",__FILE__,__func__,__LINE__);
+	printf("<%s,%s,%d>\tRetrieving Machine Hostname...\n",__FILE__,__func__,__LINE__);
 	
 	char hostname[100];
 	gethostname(hostname,sizeof(hostname));
@@ -923,18 +919,16 @@ int main(int argc, char** argv)
 	char* machineName = strtok(hostname,".");
 	if(NULL == machineName)
 	{
-		printf("<%s,%s,%d> Error retrieving Machine Hostname...\n",__FILE__,__func__,__LINE__);
+		printf("<%s,%s,%d>\tError retrieving Machine Hostname...\n",__FILE__,__func__,__LINE__);
 	}
 	else
 	{
 		//do nothing
 	}
 
-	printf("<%s,%s,%d> Initializing Node For Machine %s\n",__FILE__,__func__,__LINE__,machineName);
+	printf("<%s,%s,%d>\tInitializing Node For Machine %s\n",__FILE__,__func__,__LINE__,machineName);
 
-	nodeInfo = Parse(machineName,pathToConfig);
-
-	InitNode();
+	InitNode(machineName,pathToConfig);
 
 	PrintNodeInfo(nodeInfo);
 
@@ -945,29 +939,29 @@ int main(int argc, char** argv)
 	pthread_attr_t attr;                                                                                                                
 
 	int error_code = pthread_attr_init(&attr);                                               
-		if (error_code == -1) {                                                              
-			printf("<%s,%s,%d> Failed to create HandleMessages thread for Client at soc - error: %d\n",__FILE__,__func__,__LINE__,error_code);
-			exit(1);                                                                  
-		}                                                                            
+	if (error_code == -1) {                                                              
+		printf("<%s,%s,%d>\tFailed to Initialize Attributes for Threads! Error_code: %d\n",__FILE__,__func__,__LINE__,error_code);
+		exit(1);                                                                  
+	}                                                                            
 
-		int ds = PTHREAD_CREATE_DETACHED;                                                                      
-		error_code = pthread_attr_setdetachstate(&attr, ds);                                
-		if (error_code == -1) {                                                              
-			printf("<%s,%s,%d> Failed to create HandleMessages thread for Client at soc- error: %d\n",__FILE__,__func__,__LINE__,error_code);
-			exit(1);                                                                  
-		}    
+	int ds = PTHREAD_CREATE_DETACHED;                                                                      
+	error_code = pthread_attr_setdetachstate(&attr, ds);                                
+	if (error_code == -1) {                                                              
+		printf("<%s,%s,%d>\tFailed to Set Detach State Attributes for Threads! Error_code: %d\n",__FILE__,__func__,__LINE__,error_code);
+		exit(1);                                                                  
+	}    
 
 	//create thread for accepting incoming connections from clients
 	 error_code = pthread_create(&connectToNodes_tid,&attr,(void *)ConnectToNeighbours,NULL);
 
 	if(error_code != 0)
 	{
-		printf("<%s,%s,%d> Failed To Create ConnectToNodes Thread - error: %d\n",__FILE__,__func__,__LINE__,error_code);
+		printf("<%s,%s,%d>\tFailed To Create ConnectToNodes Thread - error: %d\n",__FILE__,__func__,__LINE__,error_code);
 		exit(1);
 	}
 	else
 	{
-		printf("<%s,%s,%d> Successfully created thread for connecting!\n",__FILE__,__func__,__LINE__);
+		printf("<%s,%s,%d>\tSuccessfully created thread for connecting!\n",__FILE__,__func__,__LINE__);
 		//do nothing
 	}
 
@@ -977,42 +971,42 @@ int main(int argc, char** argv)
 	error_code = pthread_create(&acceptConnections_tid,&attr,(void *)AcceptConnections,NULL);
 	if(error_code != 0)
 	{
-		printf("<%s,%s,%d> Failed To Create AcceptConnection Thread - error: %d\n",__FILE__,__func__,__LINE__,error_code);
+		printf("<%s,%s,%d>\tFailed To Create AcceptConnection Thread - error: %d\n",__FILE__,__func__,__LINE__,error_code);
 		exit(1);
 	}
 	else
 	{
-		printf("<%s,%s,%d> Successfully created thread for accepting connections!\n",__FILE__,__func__,__LINE__);
+		printf("<%s,%s,%d>\tSuccessfully created thread for accepting connections!\n",__FILE__,__func__,__LINE__);
 		//do nothing
 	}
 
-	pthread_join(connectToNodes_tid,NULL);
-	pthread_join(acceptConnections_tid,NULL);
+	//pthread_join(connectToNodes_tid,NULL);
+	//pthread_join(acceptConnections_tid,NULL);
 
+	while(0 == allConnectionsEstablished())
+	{
+		printf("<%s,%s,%d>\tWaiting for All Connections to Be Established...\n",__FILE__,__func__,__LINE__);
+		sleep(2);
+	}
 
-	printf("<%s,%s,%d> Waiting for All Connections to Be Established...\n",__FILE__,__func__,__LINE__);
-	sleep(5);
-
-	
-	//Pelegs();
 	StartFlood();
 
-	while(UNKNOWN == nodeInfo.status);
+	// while(UNKNOWN == nodeInfo.status);
 
-	if(LEADER == nodeInfo.status)
-	{
-		sleep(10);
-		BFS();
+	// if(LEADER == nodeInfo.status)
+	// {
+	// 	sleep(10);
+	// 	BFS();
 
-	}
-	else
-	{
-		//do nothing - leader will initialize BFS
-	}
+	// }
+	// else
+	// {
+	// 	//do nothing - leader will initialize BFS
+	// }
 
-	PrintNodeBFSInfo(nodeInfo);
+	// PrintNodeBFSInfo(nodeInfo);
 
-	sleep(10);
+	sleep(10000);
 
 	CloseConnections();
 
