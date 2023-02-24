@@ -772,7 +772,11 @@ void PelegsAlgorithm(struct Message msg)
 	{
 		printf("<%s,%s,%d>\tNode.maxUIDSeen: %d, Node.Round: %d, Msg.currMaxUID: %d, Msg.Round: %d!\n", __FILE__, __func__, __LINE__,nodeInfo.maxUIDSeen,nodeInfo.round, msg.currMaxUID,msg.round);
 
+<<<<<<< HEAD
 		nodeInfo.currLeaderCount++;
+=======
+		nodeInfo.currLeaderRoundCount++;
+>>>>>>> c165cd4f2e29934bd61c8ff8f3f753d618b30d33
 		nodeInfo.currMaxUIDRound = msg.round;
 	}
 	else
@@ -780,7 +784,11 @@ void PelegsAlgorithm(struct Message msg)
 		//do nothing
 	}
 	
+<<<<<<< HEAD
 	if((nodeInfo.currLeaderCount > 3) && (nodeInfo.maxUIDSeen == msg.currMaxUID) && (nodeInfo.maxUIDSeen == atoi(nodeInfo.myUID)))
+=======
+	if((nodeInfo.currLeaderRoundCount > 3) && (nodeInfo.maxUIDSeen == msg.currMaxUID) && (nodeInfo.maxUIDSeen == atoi(nodeInfo.myUID)))
+>>>>>>> c165cd4f2e29934bd61c8ff8f3f753d618b30d33
 	{
 		//Start a flood terminate message!
 		printf("<%s,%s,%d>\tReceived 3 Rounds of Messages With Same Max UID %d!\n", __FILE__, __func__, __LINE__, msg.currMaxUID);
@@ -798,7 +806,7 @@ void PelegsAlgorithm(struct Message msg)
 			nodeInfo.maxUIDSeen = msg.currMaxUID;
 			nodeInfo.currDistToNode = msg.currDist + 1;
 			nodeInfo.maxDist = nodeInfo.currDistToNode;
-			nodeInfo.currLeaderCount = 1;
+			nodeInfo.currLeaderRoundCount = 1;
 		}
 		else if(nodeInfo.maxUIDSeen == msg.currMaxUID)
 		{
@@ -807,7 +815,11 @@ void PelegsAlgorithm(struct Message msg)
 
 			if(msg.currMaxDist > nodeInfo.maxDist)
 			{
+<<<<<<< HEAD
 				nodeInfo.currLeaderCount = 1;
+=======
+				nodeInfo.currLeaderRoundCount = 1;
+>>>>>>> c165cd4f2e29934bd61c8ff8f3f753d618b30d33
 				nodeInfo.maxDist = msg.currMaxDist;
 			}
 				
@@ -863,7 +875,11 @@ void InitNode(char* machineName, char* pathToConfig)
 	nodeInfo.maxDist = 0;
 	nodeInfo.round = 1;
 	nodeInfo.currDistToNode = 0;
+<<<<<<< HEAD
 	nodeInfo.currLeaderCount = 0;
+=======
+	nodeInfo.currLeaderRoundCount = 0;
+>>>>>>> c165cd4f2e29934bd61c8ff8f3f753d618b30d33
 	nodeInfo.currMaxUIDRound = 0;
 	nodeInfo.status = UNKNOWN;
 }
