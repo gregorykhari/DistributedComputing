@@ -530,6 +530,7 @@ void HandleMessages(void *ni)
 
 		//check if received a 
 		while(0 == isSynchronized());
+		printf("Nodes are sync\n");
 		
 		switch (recv_msg.msgT)
 		{
@@ -714,11 +715,6 @@ int isSynchronized()
 	int i;
 	for (i = 0 ;i < nodeInfo.numNeighbours; i++)
 	{
-
-		if (nodeInfo.maxRoundsInNeighbours[i] == -1)
-		{
-			return 0;
-		}
 		if (nodeInfo.maxRoundsInNeighbours[i] < currMin)
 		{
 			currMin = nodeInfo.maxRoundsInNeighbours[i];
@@ -802,7 +798,6 @@ void CloseConnection(int index)
 
 void PelegsAlgorithm(struct Message msg)
 {
-
 	int neighbourIndex = getNeighbourIndex(msg);
 
 	if(nodeInfo.maxUIDSeen < msg.currMaxUID)
@@ -828,6 +823,7 @@ void PelegsAlgorithm(struct Message msg)
 				printf("<%s,%s,%d>\tReceived 3 Rounds of Messages With Same Max UID %d!\n", __FILE__, __func__, __LINE__, msg.currMaxUID);
 				nodeInfo.status = LEADER;
 				StartFloodTerminate();
+				return;
 			}
 		}
 		else{
@@ -841,6 +837,7 @@ void PelegsAlgorithm(struct Message msg)
 		}
 	}
 	else{
+		printf("<%s,%s,%d>\tInside Main ELSE!\n", __FILE__, __func__, __LINE__);
 		return;
 	}
 	//Updating Received Round from Neighbour
@@ -909,7 +906,6 @@ void StartFlood(){
 	printf("<%s,%s,%d>\tStarting FLOOD!\n", __FILE__, __func__, __LINE__);
 	struct Message msg = CreateFloodMessage();
 	Broadcast(msg);
-	nodeInfo.round++;
 	printf("<%s,%s,%d>\tFinished FLOOD! Current UID: %s\n", __FILE__, __func__, __LINE__, nodeInfo.myUID);
 }
 
@@ -1030,8 +1026,11 @@ int main(int argc, char** argv)
 
 	StartFlood();
 
+	while(nodeInfo.status == UNKNOWN);
+
 	printf("<%s,%s,%d>\tStatus After Pelegs For Node %s = %s\n",__FILE__,__func__,__LINE__,nodeInfo.myUID,status_str[nodeInfo.status]);
 
+/*
 	if(LEADER == nodeInfo.status)
 	{
 		sleep(10);
@@ -1049,7 +1048,7 @@ int main(int argc, char** argv)
 	}
 
 	PrintNodeBFSInfo(nodeInfo);
-
+*/
 	CloseConnections();
 
 	return 0;
