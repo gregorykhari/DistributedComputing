@@ -27,7 +27,7 @@
 static struct Node nodeInfo;
 static bool isSync = false;
 static const char* msgType_str[] = {"CONNECTION", "FLOOD", "FLOOD_TERMINATE", "SEARCH", "ACK", "NACK", "CLOSE"};
-static const char* status_str[] = {"LEADER", "NON_LEADER", "UNKNOWN"};
+const char* status_str[] = {"LEADER", "NON_LEADER", "UNKNOWN"};
 
 void PrintHelp();
 
@@ -475,13 +475,12 @@ void HandleMessages(void *ni)
 	}
 	else
 	{
-		printf("<%s,%s,%d>\tSuccessfully Received Round %d %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,recv_msg.round,msgType_str[recv_msg.msgT],recv_msg.srcUID,nodeInfo.neighbourSockets[neighbourIndex]);
+		if (recv_msg.msgT != CONNECTION)
+			printf("<%s,%s,%d>\tSuccessfully Received Round %d %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,recv_msg.round,msgType_str[recv_msg.msgT],recv_msg.srcUID,nodeInfo.neighbourSockets[neighbourIndex]);
 	}
 
 	while(1)
 	{
-		printf("<%s,%s,%d>\trecv_msg.round= %d, nodeInfo.maxRoundsInNeighbours[%d]= %d\n",__FILE__,__func__,__LINE__,recv_msg.round,neighbourIndex,nodeInfo.maxRoundsInNeighbours[neighbourIndex]);
-
 		//determine round for which message was sent
 		if(recv_msg.round > nodeInfo.maxRoundsInNeighbours[neighbourIndex])
 		{
@@ -495,6 +494,7 @@ void HandleMessages(void *ni)
 		switch (recv_msg.msgT)
 		{
 			case CONNECTION:
+				return;
 				break;
 			
 			case FLOOD:
@@ -545,7 +545,8 @@ void HandleMessages(void *ni)
 		}
 		else
 		{
-			printf("<%s,%s,%d>\tSuccessfully Received Round %d %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,recv_msg.round,msgType_str[recv_msg.msgT],recv_msg.srcUID,nodeInfo.neighbourSockets[neighbourIndex]);
+			if (recv_msg.msgT != CONNECTION)
+				printf("<%s,%s,%d>\tSuccessfully Received Round %d %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,recv_msg.round,msgType_str[recv_msg.msgT],recv_msg.srcUID,nodeInfo.neighbourSockets[neighbourIndex]);
 		}
 	}
 }
@@ -580,6 +581,9 @@ void HandleSearchMessage(struct Message msg)
 	}
 	else
 	{
+		
+		printf("<%s,%s,%d>\tMarking Neighbour with UID %s As Parent!",__FILE__,__func__,__LINE__,nodeInfo.parentUID);
+
 		//mark the first node we received a search message from as parent
 		nodeInfo.marked = 1;
 
@@ -587,12 +591,36 @@ void HandleSearchMessage(struct Message msg)
 
 		nodeInfo.neighbourRepliedToSearch[index] = 1;
 
+		//save node we received SEARCH from as parent
 		char parentUID[10];
 		sprintf(parentUID,"%d",msg.srcUID);
 		strcpy(nodeInfo.parentUID,parentUID);
 
 		//send search message to all children
 		BFS();
+
+		while(0 == receivedBFSReplyFromAllNeighbours())
+		{
+			sleep(1);
+		}
+
+		//check if we already sent search messages to all neighbours
+		struct Message msg = CreateMessage(ACK);
+		msg.dstUID = atoi(nodeInfo.neighbourUIDs[index]);
+		int error_code = send(nodeInfo.neighbourSockets[index],&msg,sizeof(msg),0);
+		if(error_code < 0)
+		{
+			printf("<%s,%s,%d>\tFailed to Send ACK Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[index],nodeInfo.neighbourSockets[index]);
+			exit(1);
+		}
+		else
+		{
+			//do nothing- message was sent successfully
+			printf("<%s,%s,%d>\tSuccessfully Sent ACK Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,nodeInfo.neighbourUIDs[index],nodeInfo.neighbourSockets[index]);
+		}
+
+
+		
 	}
 }
 
@@ -617,33 +645,33 @@ void HandleACKMessage(struct Message msg)
 		}
 	}
 
-	struct Message send_msg = CreateMessage(ACK);
-	send_msg.round = nodeInfo.round;
-	msg.dstUID = msg.srcUID;
+	// struct Message send_msg = CreateMessage(ACK);
+	// send_msg.round = nodeInfo.round;
+	// msg.dstUID = msg.srcUID;
 
-	//if all neighbours have now replied, send ACK up to parent
-	if(1 == receivedBFSReplyFromAllNeighbours())
-	{
-		//perform converge cast and finally send ACK to parent
-		send_msg.round = nodeInfo.round;
-		int error_code = send(nodeInfo.neighbourSockets[i],&send_msg,sizeof(send_msg),0);
-		if(error_code < 0)
-		{
-			printf("<%s,%s,%d>\tFailed to Send Round %d %s Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,send_msg.round,msgType_str[send_msg.msgT],nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
-			exit(1);
-		}
-		else
-		{
-			//do nothing- message was sent successfully
-			printf("<%s,%s,%d>\tSuccessfully Sent Round %d %s Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,send_msg.round,msgType_str[send_msg.msgT],nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
-		}
-	}
-	else
-	{
-		//do nothing - still need more replies to proceed
-	}
+	// //if all neighbours have now replied, send ACK up to parent
+	// if(1 == receivedBFSReplyFromAllNeighbours())
+	// {
+	// 	//perform converge cast and finally send ACK to parent
+	// 	send_msg.round = nodeInfo.round;
+	// 	int error_code = send(nodeInfo.neighbourSockets[i],&send_msg,sizeof(send_msg),0);
+	// 	if(error_code < 0)
+	// 	{
+	// 		printf("<%s,%s,%d>\tFailed to Send Round %d %s Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,send_msg.round,msgType_str[send_msg.msgT],nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
+	// 		exit(1);
+	// 	}
+	// 	else
+	// 	{
+	// 		//do nothing- message was sent successfully
+	// 		printf("<%s,%s,%d>\tSuccessfully Sent Round %d %s Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,send_msg.round,msgType_str[send_msg.msgT],nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
+	// 	}
+	// }
+	// else
+	// {
+	// 	//do nothing - still need more replies to proceed
+	// }
 
-	nodeInfo.round = nodeInfo.round + 1;
+	//nodeInfo.round = nodeInfo.round + 1;
 	
 }
 
@@ -659,31 +687,31 @@ void HandleNACKMessage(struct Message msg)
 	//set that neighbour has replied
 	nodeInfo.neighbourRepliedToSearch[neighbourIndex] = 1;
 	
-	//if all neighbours have now replied, send ACK up to parent
-	if(1 == receivedBFSReplyFromAllNeighbours())
-	{
-		//perform converge cast and finally send ACK to parent
-		struct Message send_msg = CreateMessage(NACK);
-		send_msg.round = nodeInfo.round;
-		msg.dstUID = msg.srcUID;
-		int error_code = send(nodeInfo.neighbourSockets[i],&send_msg,sizeof(send_msg),0);
-		if(error_code < 0)
-		{
-			printf("<%s,%s,%d>\tFailed to Send Round %d %s Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,send_msg.round,msgType_str[send_msg.msgT],nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
-			exit(1);
-		}
-		else
-		{
-			//do nothing- message was sent successfully
-			printf("<%s,%s,%d>\tSuccessfully Sent Round %d %s Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,send_msg.round,msgType_str[send_msg.msgT],nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
-		}
-	}
-	else
-	{
-		//do nothing - still need more replies to proceed
-	}
+	// //if all neighbours have now replied, send ACK up to parent
+	// if(1 == receivedBFSReplyFromAllNeighbours())
+	// {
+	// 	//perform converge cast and finally send ACK to parent
+	// 	struct Message send_msg = CreateMessage(NACK);
+	// 	send_msg.round = nodeInfo.round;
+	// 	msg.dstUID = msg.srcUID;
+	// 	int error_code = send(nodeInfo.neighbourSockets[i],&send_msg,sizeof(send_msg),0);
+	// 	if(error_code < 0)
+	// 	{
+	// 		printf("<%s,%s,%d>\tFailed to Send Round %d %s Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,send_msg.round,msgType_str[send_msg.msgT],nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
+	// 		exit(1);
+	// 	}
+	// 	else
+	// 	{
+	// 		//do nothing- message was sent successfully
+	// 		printf("<%s,%s,%d>\tSuccessfully Sent Round %d %s Message to Neighbour with UID %s on Socket %d!",__FILE__,__func__,__LINE__,send_msg.round,msgType_str[send_msg.msgT],nodeInfo.neighbourUIDs[i],nodeInfo.neighbourSockets[i]);
+	// 	}
+	// }
+	// else
+	// {
+	// 	//do nothing - still need more replies to proceed
+	// }
 
-	nodeInfo.round = nodeInfo.round + 1;
+	// nodeInfo.round = nodeInfo.round + 1;
 
 }
 
@@ -747,9 +775,9 @@ int getNeighbourIndex(char *node_uid){
 void CloseConnections()
 {
 	int i = 0;
-	struct Message closeConnectionMsg = CreateMessage(CLOSE);
-	closeConnectionMsg.round = nodeInfo.round + 1;
-	Broadcast(closeConnectionMsg);
+	//struct Message closeConnectionMsg = CreateMessage(CLOSE);
+	//closeConnectionMsg.round = nodeInfo.round + 1;
+	//Broadcast(closeConnectionMsg);
 	for(i = 0; i < nodeInfo.numNeighbours; i++)
 	{
 
@@ -772,11 +800,7 @@ void PelegsAlgorithm(struct Message msg)
 	{
 		printf("<%s,%s,%d>\tNode.maxUIDSeen: %d, Node.Round: %d, Msg.currMaxUID: %d, Msg.Round: %d!\n", __FILE__, __func__, __LINE__,nodeInfo.maxUIDSeen,nodeInfo.round, msg.currMaxUID,msg.round);
 
-<<<<<<< HEAD
-		nodeInfo.currLeaderCount++;
-=======
 		nodeInfo.currLeaderRoundCount++;
->>>>>>> c165cd4f2e29934bd61c8ff8f3f753d618b30d33
 		nodeInfo.currMaxUIDRound = msg.round;
 	}
 	else
@@ -784,11 +808,7 @@ void PelegsAlgorithm(struct Message msg)
 		//do nothing
 	}
 	
-<<<<<<< HEAD
-	if((nodeInfo.currLeaderCount > 3) && (nodeInfo.maxUIDSeen == msg.currMaxUID) && (nodeInfo.maxUIDSeen == atoi(nodeInfo.myUID)))
-=======
 	if((nodeInfo.currLeaderRoundCount > 3) && (nodeInfo.maxUIDSeen == msg.currMaxUID) && (nodeInfo.maxUIDSeen == atoi(nodeInfo.myUID)))
->>>>>>> c165cd4f2e29934bd61c8ff8f3f753d618b30d33
 	{
 		//Start a flood terminate message!
 		printf("<%s,%s,%d>\tReceived 3 Rounds of Messages With Same Max UID %d!\n", __FILE__, __func__, __LINE__, msg.currMaxUID);
@@ -815,11 +835,7 @@ void PelegsAlgorithm(struct Message msg)
 
 			if(msg.currMaxDist > nodeInfo.maxDist)
 			{
-<<<<<<< HEAD
-				nodeInfo.currLeaderCount = 1;
-=======
 				nodeInfo.currLeaderRoundCount = 1;
->>>>>>> c165cd4f2e29934bd61c8ff8f3f753d618b30d33
 				nodeInfo.maxDist = msg.currMaxDist;
 			}
 				
@@ -853,8 +869,22 @@ void BFS()
 
 			struct Message msg = CreateMessage(SEARCH);
 			msg.dstUID = atoi(nodeInfo.neighbourUIDs[i]);
-			Broadcast(msg);
+			msg.round = nodeInfo.round;
+			//Broadcast(msg);
+			printf("<%s,%s,%d>\tSending Round %d %s Message to Neighbour with UID %d on Socket %d!\n", __FILE__, __func__, __LINE__, msg.round, msgType_str[msg.msgT],msg.dstUID,nodeInfo.neighbourSockets[i]);
+			
+			int error_code = send(nodeInfo.neighbourSockets[i], &msg, sizeof(msg),0);
+			if(error_code < 0)
+			{
+				printf("<%s,%s,%d>\tFailed to Send Round %d %s Message to Neighbour With UID %s On Socket %s! Error_Code: %d\n", __FILE__, __func__, __LINE__,msg.round, msgType_str[msg.msgT],nodeInfo.neighbourUIDs[i], nodeInfo.neighbourSockets[i],error_code);
+				exit(1);
+			}
+			else
+			{
+				printf("<%s,%s,%d>\tSuccessfully Sent Round %d %s Message to Neighbour With UID %d On Socket %d\n", __FILE__, __func__, __LINE__, msg.round, msgType_str[msg.msgT],msg.dstUID, nodeInfo.neighbourSockets[i]);
+			}
 		}
+		nodeInfo.round = nodeInfo.round + 1;
 }
 
 void InitNode(char* machineName, char* pathToConfig)
@@ -875,11 +905,7 @@ void InitNode(char* machineName, char* pathToConfig)
 	nodeInfo.maxDist = 0;
 	nodeInfo.round = 1;
 	nodeInfo.currDistToNode = 0;
-<<<<<<< HEAD
-	nodeInfo.currLeaderCount = 0;
-=======
 	nodeInfo.currLeaderRoundCount = 0;
->>>>>>> c165cd4f2e29934bd61c8ff8f3f753d618b30d33
 	nodeInfo.currMaxUIDRound = 0;
 	nodeInfo.status = UNKNOWN;
 }
@@ -1041,7 +1067,7 @@ int main(int argc, char** argv)
 
 	if(LEADER == nodeInfo.status)
 	{
-		sleep(10);
+		sleep(3);
 		BFS();
 	}
 	else
@@ -1056,6 +1082,8 @@ int main(int argc, char** argv)
 	}
 
 	PrintNodeBFSInfo(nodeInfo);
+
+	sleep(5);
 
 	CloseConnections();
 

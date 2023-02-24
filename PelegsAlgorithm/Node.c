@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "Node.h"
 
+static const char* status_str[] = {"LEADER", "NON_LEADER", "UNKNOWN"};
+
 void PrintNodeInfo(struct Node nodeInfo)
 {
 
@@ -23,14 +25,14 @@ void PrintNodeBFSInfo(struct Node nodeInfo)
 {
 	int i;
 
-	printf("<%s,%s,%d>\tNode Status: %d\n",__FILE__,__func__,__LINE__,nodeInfo.status);
+	printf("<%s,%s,%d>\tNode Status: %s\n",__FILE__,__func__,__LINE__,status_str[nodeInfo.status]);
 
-	printf("<%s,%s,%d>\tParent of Node with UID %s: \n",__FILE__,__func__,__LINE__,nodeInfo.parentUID);
+	printf("<%s,%s,%d>\tParent of Node with UID %s : %s\n",__FILE__,__func__,__LINE__,nodeInfo.myUID,nodeInfo.parentUID);
 
 	printf("<%s,%s,%d>\tChildren of Node with UID %s: {",__FILE__,__func__,__LINE__,nodeInfo.myUID);
 	for(i = 0; i < nodeInfo.numNeighbours; i++)
 	{
-		printf("%s,\t",nodeInfo.childrenUIDs[i]);
+		printf("%s\t",nodeInfo.childrenUIDs[i]);
 	}
-	printf(" }");
+	printf(" }\n");
 }
