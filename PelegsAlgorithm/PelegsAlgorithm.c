@@ -1083,7 +1083,7 @@ int main(int argc, char** argv)
 
 	PrintNodeBFSInfo(nodeInfo);
 
-	sleep(5);
+	sleep(20);
 
 	CloseConnections();
 
