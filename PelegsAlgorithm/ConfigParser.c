@@ -25,11 +25,11 @@ struct Node Parse(char* machineName, char* pathToConfig)
     int k,hostK;
     int LaFlag = 0, LbFlag = 0;
 
-    printf("<%s,%s,%d> Opening Config File %s!\n",__FILE__,__func__,__LINE__,pathToConfig);
+    printf("<%s,%s,%d>\tOpening Config File %s!\n",__FILE__,__func__,__LINE__,pathToConfig);
 
     if(NULL == (fp = fopen(pathToConfig,"r")))
     {
-        printf("<%s,%s,%d> ERROR: Failed to open config file %s for reading!",__FILE__,__func__,__LINE__,pathToConfig);
+        printf("<%s,%s,%d>\tERROR: Failed to open config file %s for reading!",__FILE__,__func__,__LINE__,pathToConfig);
         exit(1);
     }
     else
