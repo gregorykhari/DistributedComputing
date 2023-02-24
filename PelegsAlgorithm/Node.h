@@ -35,7 +35,7 @@ struct Node
     int maxUIDSeen;
     int maxDist;
     int currDistToNode;
-    int currLeaderCount;
+    int currLeaderRoundCount;
 
     int marked; //for BFS - whether a node has received a 
     char parentUID[CHAR_BUFFER_SIZE]; //the UID of the parent node

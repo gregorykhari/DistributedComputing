@@ -57,8 +57,9 @@ struct Message CreateNACKMessage();
 struct Message CreateCloseMessage();
 
 int receivedBFSReplyFromAllNeighbours();
-int getMaxRoundToStart();
-int getNeighbourIndex(char *node_uid);
+int getRoundToStart();
+int getNeighbourIndex(struct Message msg);
+bool receivedMessageFromAllNeighbour();
 
 void PelegsAlgorithm(struct Message msg);
 void BFS();
@@ -228,7 +229,7 @@ int CreateSocket(int port)
 	int node_socket = socket(AF_INET,SOCK_STREAM,0);
 	if (node_socket < 0)
 	{
-		printf("<%s,%s,%d>\tFailed to Create Socket! Error: %d!\n",__FILE__,__func__,__LINE__,errno,strerror(errno));
+		printf("<%s,%s,%d>\tFailed to Create Socket! Error: %d\t And error: %s!\n",__FILE__,__func__,__LINE__,node_socket,strerror(node_socket));
 		return -1;
 	}
 	else
@@ -264,7 +265,7 @@ void Broadcast(struct Message msg)
 		int error_code = send(nodeInfo.neighbourSockets[i], &msg, sizeof(msg),0);
 		if(error_code < 0)
 		{
-			printf("<%s,%s,%d>\tFailed to Send Round %d %s Message to Neighbour With UID %s On Socket %s! Error_Code: %d\n", __FILE__, __func__, __LINE__,msg.round, msgType_str[msg.msgT],nodeInfo.neighbourUIDs[i], nodeInfo.neighbourSockets[i],error_code);
+			printf("<%s,%s,%d>\tFailed to Send Round %d %s Message to Neighbour With UID %s On Socket %d! Error_Code: %d\n", __FILE__, __func__, __LINE__,msg.round, msgType_str[msg.msgT],nodeInfo.neighbourUIDs[i], nodeInfo.neighbourSockets[i],error_code);
 			exit(1);
 		}
 		else
@@ -274,7 +275,6 @@ void Broadcast(struct Message msg)
 	}
 
 	printf("<%s,%s,%d>\tSuccessfully Broadcasted ROUND %d %s Message to All Neighbours!\n", __FILE__, __func__, __LINE__, msg.round, msgType_str[msg.msgT]);
-	nodeInfo.round = nodeInfo.round + 1;
 }
 
 void ConnectToNeighbours()
@@ -450,12 +450,10 @@ void AcceptConnections()
 		}
 
 		//determine index of node based on srcUID of CONNECTION message just received
-		char node_uid[BUFFER_SIZE];
-		sprintf(node_uid, "%d", recv_msg.srcUID);
-		int neighbourIndex = getNeighbourIndex(node_uid);
+		int neighbourIndex = getNeighbourIndex(recv_msg);
 		nodeInfo.neighbourSockets[neighbourIndex] = node_socket;
 
-		printf("<%s,%s,%d>\tSuccessfully Established Connection With Neighbour %s on Socket %d\n",__FILE__,__func__,__LINE__,node_uid,nodeInfo.neighbourSockets[neighbourIndex]);
+		printf("<%s,%s,%d>\tSuccessfully Established Connection With Neighbour %d on Socket %d\n",__FILE__,__func__,__LINE__,recv_msg.srcUID,nodeInfo.neighbourSockets[neighbourIndex]);
 
 		//create a variable to pass network socket to thread args
 		int* ni = malloc(sizeof(int));
@@ -589,16 +587,12 @@ void HandleMessages(void *ni)
 
 void HandleSearchMessage(struct Message msg)
 {
-
-	char srcUID[BUFFER_SIZE];
-	sprintf(srcUID,"%d",msg.srcUID);
-
 	if(1 == nodeInfo.marked)
 	{
 		printf("<%s,%s,%d>\tAlready Marked Neighbour with UID %s As Parent!",__FILE__,__func__,__LINE__,nodeInfo.parentUID);
 
 		//determine socket to send NACK message back to base on recv_msg srcUID
-		int socketIndex = getNeighbourIndex(srcUID);
+		int socketIndex = getNeighbourIndex(msg);
 
 		//check if we already sent search messages to all neighbours
 		struct Message msg = CreateNACKMessage();
@@ -619,7 +613,7 @@ void HandleSearchMessage(struct Message msg)
 		//mark the first node we received a search message from as parent
 		nodeInfo.marked = 1;
 
-		int index = getNeighbourIndex(srcUID);
+		int index = getNeighbourIndex(msg);
 
 		nodeInfo.neighbourRepliedToSearch[index] = 1;
 
@@ -634,10 +628,7 @@ void HandleSearchMessage(struct Message msg)
 
 void HandleACKMessage(struct Message msg)
 {
-	char srcUID[10];
-	sprintf(srcUID,"%d",msg.srcUID);
-
-	int neighbourIndex = getNeighbourIndex(srcUID);
+	int neighbourIndex = getNeighbourIndex(msg);
 
 	//set that neighbour has replied
 	nodeInfo.neighbourRepliedToSearch[neighbourIndex] = 1;
@@ -648,6 +639,8 @@ void HandleACKMessage(struct Message msg)
 	{
 		if(0 == strcmp(nodeInfo.childrenUIDs[i],"\0"))
 		{
+			char srcUID[10];
+			sprintf(srcUID,"%d",msg.srcUID);
 			strcpy(nodeInfo.childrenUIDs[i],srcUID);
 			break;
 		}
@@ -684,10 +677,7 @@ void HandleNACKMessage(struct Message msg)
 {
 	int i;
 
-	char srcUID[10];
-	sprintf(srcUID,"%d",msg.srcUID);
-
-	int neighbourIndex = getNeighbourIndex(srcUID);
+	int neighbourIndex = getNeighbourIndex(msg);
 
 	//set that neighbour has replied
 	nodeInfo.neighbourRepliedToSearch[neighbourIndex] = 1;
@@ -749,7 +739,12 @@ int isSynchronized()
 	}
 }
 
-int getMaxRoundToStart(){
+int getRoundToStart(){
+	/*
+		Condition to increment the round. 
+		1. Received message from all neighbours for current round
+		2. Special case:- If round received could be 1 greater than current round that it is waiting.
+	*/
 	int maxVal = 0, i = 0;
 	for(; i < nodeInfo.numNeighbours; i++){
 		if(nodeInfo.maxRoundsInNeighbours[i] > maxVal){
@@ -759,7 +754,9 @@ int getMaxRoundToStart(){
 	return maxVal + 1;
 }
 
-int getNeighbourIndex(char *node_uid){
+int getNeighbourIndex(struct Message msg){
+	char node_uid[BUFFER_SIZE];
+	sprintf(node_uid, "%d", msg.srcUID);
 	int i, neighbourIndex = -1;
 	for(i = 0; i < nodeInfo.numNeighbours; i++)
 	{
@@ -772,6 +769,16 @@ int getNeighbourIndex(char *node_uid){
 
 	return neighbourIndex;
 
+}
+bool receivedMessageFromAllNeighbour(){
+	int i = 0;
+	int currRound = nodeInfo.maxRoundsInNeighbours[0];
+	for (; i < nodeInfo.numNeighbours; i++){
+		if (currRound != nodeInfo.maxRoundsInNeighbours[i]){
+			return false;
+		}
+	}
+	return true;
 }
 
 void CloseConnections()
@@ -795,51 +802,67 @@ void CloseConnection(int index)
 
 void PelegsAlgorithm(struct Message msg)
 {
-	if(nodeInfo.maxUIDSeen == msg.currMaxUID)
-	{
-		nodeInfo.currLeaderCount++;
-	}
-	else
-	{
-		//do nothing
-	}
-	
-	if(nodeInfo.currLeaderCount > 3 && nodeInfo.maxUIDSeen == msg.currMaxUID)
-	{
-		//Start a flood terminate message!
-		printf("<%s,%s,%d>\tReceived 3 Rounds of Messages With Same Max UID %d!\n", __FILE__, __func__, __LINE__, msg.currMaxUID);
-		printf("<%s,%s,%d>\tStart the FLOOD TERMINATION!\n", __FILE__, __func__, __LINE__);
-		nodeInfo.status = LEADER;
-		StartFloodTerminate();
-	}
-	else
-	{
-		if(nodeInfo.maxUIDSeen < msg.currMaxUID)
-		{
-			printf("<%s,%s,%d>\tReceived Message with Larger UID %d Than Current Max %d\n", __FILE__, __func__, __LINE__,msg.currMaxUID,nodeInfo.maxUIDSeen);
-			printf("<%s,%s,%d>\tUpdating Current Max UID!\n", __FILE__, __func__, __LINE__);
 
-			nodeInfo.maxUIDSeen = msg.currMaxUID;
-			nodeInfo.currDistToNode = msg.currDist + 1;
-			nodeInfo.maxDist = nodeInfo.currDistToNode;
-			nodeInfo.currLeaderCount = 1;
+	int neighbourIndex = getNeighbourIndex(msg);
+
+	if(nodeInfo.maxUIDSeen < msg.currMaxUID)
+	{
+		printf("<%s,%s,%d>\tReceived Message with Larger UID %d Than Current Max %d\n", __FILE__, __func__, __LINE__,msg.currMaxUID,nodeInfo.maxUIDSeen);
+		printf("<%s,%s,%d>\tUpdating Current Max UID!\n", __FILE__, __func__, __LINE__);
+
+		nodeInfo.maxUIDSeen = msg.currMaxUID;
+		nodeInfo.currDistToNode = msg.currDist + 1;
+		nodeInfo.maxDist = nodeInfo.currDistToNode;
+		nodeInfo.currLeaderRoundCount = 1;
+	}
+	else if(nodeInfo.maxUIDSeen == msg.currMaxUID){
+		if((nodeInfo.maxDist == msg.currMaxDist) && (nodeInfo.maxRoundsInNeighbours[neighbourIndex] != msg.round)){
+			nodeInfo.currLeaderRoundCount++;
+			if((nodeInfo.currLeaderRoundCount > 3) && (atoi(nodeInfo.myUID) == nodeInfo.maxUIDSeen)){
+				/*Conditions for incrementing the currLeaderCount are
+					1. Same maxUIDSeen
+					2. Same maxDistance in Message 
+					3. Different Round than the previous round
+				*/
+				
+				printf("<%s,%s,%d>\tReceived 3 Rounds of Messages With Same Max UID %d!\n", __FILE__, __func__, __LINE__, msg.currMaxUID);
+				nodeInfo.status = LEADER;
+				StartFloodTerminate();
+			}
 		}
-		else if(nodeInfo.maxUIDSeen == msg.currMaxUID)
-		{
-			printf("<%s,%s,%d>\tReceived Message with the Same MAX UID %d\n", __FILE__, __func__, __LINE__,msg.currMaxUID);
-			printf("<%s,%s,%d>\tSetting the MAX Distance\n", __FILE__, __func__, __LINE__);
-
+		else{
+			//Update maxDistance and also counter set to 1(Wait for 3 more rounds)
 			if(msg.currMaxDist > nodeInfo.maxDist)
 			{
+				printf("<%s,%s,%d>\tUpdating current Max Distance: Current UID:%s \t Current MAX Distance: %d!\n", __FILE__, __func__, __LINE__, nodeInfo.myUID, nodeInfo.maxDist);
 				nodeInfo.maxDist = msg.currMaxDist;
+				nodeInfo.currLeaderRoundCount = 1;
 			}
-				
-			//printf("<%s,%s,%d>\tRECV Same UID\t maxDistance: %d\n", __FILE__, __func__, __LINE__, nodeInfo.maxDist);
 		}
-
-		//struct Message reply_msg = CreateFloodMessage();
-		//Broadcast(reply_msg);
 	}
+	else{
+		return;
+	}
+	//Updating Received Round from Neighbour
+	if(msg.round > nodeInfo.maxRoundsInNeighbours[neighbourIndex]){
+		nodeInfo.maxRoundsInNeighbours[neighbourIndex] = msg.round;
+	}
+	
+	if(receivedMessageFromAllNeighbour()){
+		//If message received from all the neighbours then, start a new round!
+		nodeInfo.round++;
+		printf("<%s,%s,%d>\tUpdating Round in Node UID: %d \t Round %d!\n", __FILE__, __func__, __LINE__, msg.dstUID, nodeInfo.round);
+	}
+
+	//Update if received for higher round
+	if (msg.round > nodeInfo.round){
+		printf("<%s,%s,%d>\tUpdating maxRound in Node UID: %d \t Round %d!\n", __FILE__, __func__, __LINE__, msg.dstUID, msg.round);
+		nodeInfo.round = msg.round;
+	}
+
+	struct Message reply_msg = CreateFloodMessage();
+	Broadcast(reply_msg);
+	
 }
 
 void BFS()
@@ -868,7 +891,7 @@ void InitNode(char* machineName, char* pathToConfig)
 	for (i = 0; i < nodeInfo.numNeighbours; i++){
 		nodeInfo.neighbourSockets[i] = -1;
 		nodeInfo.neighbourRepliedToSearch[i] = 0;
-		nodeInfo.maxRoundsInNeighbours[i] = 0;
+		nodeInfo.maxRoundsInNeighbours[i] = -1;
 		strcpy(nodeInfo.childrenUIDs[i],"\0");
 	}
 
@@ -877,31 +900,25 @@ void InitNode(char* machineName, char* pathToConfig)
 	nodeInfo.maxDist = 0;
 	nodeInfo.round = 0;
 	nodeInfo.currDistToNode = 0;
-	nodeInfo.currLeaderCount= 1;
+	nodeInfo.currLeaderRoundCount= 1;
 	nodeInfo.status = UNKNOWN;
 }
 
-void StartFlood()
-{
-	printf("<%s,%s,%d>\tStarting FLOOD!\n", __FILE__, __func__, __LINE__);
+void StartFlood(){
 
-	while(UNKNOWN == nodeInfo.status)
-	{
-		struct Message msg = CreateFloodMessage();
-		//int currRound = getMaxRoundToStart();
-		msg.round = nodeInfo.round;
-		Broadcast(msg);
-		printf("<%s,%s,%d>\tSent ROUND %d %s Message to All Neighbours!\n", __FILE__, __func__, __LINE__, msg.round, msgType_str[msg.msgT]);
-		sleep(2);
-	}
+	printf("<%s,%s,%d>\tStarting FLOOD!\n", __FILE__, __func__, __LINE__);
+	struct Message msg = CreateFloodMessage();
+	Broadcast(msg);
+	nodeInfo.round++;
+	printf("<%s,%s,%d>\tFinished FLOOD! Current UID: %s\n", __FILE__, __func__, __LINE__, nodeInfo.myUID);
 }
 
 void StartFloodTerminate(){
-
+	printf("<%s,%s,%d>\tStarting FLOOD TERMINATE!\n", __FILE__, __func__, __LINE__);
 	struct Message msg = CreateFloodTerminationMessage();
-	int currRound = getMaxRoundToStart();
-	msg.round = currRound;
+	nodeInfo.round++;
 	Broadcast(msg);
+	printf("<%s,%s,%d>\tFinished FLOOD TERMINATE! Current UID: %s\n", __FILE__, __func__, __LINE__, nodeInfo.myUID);
 }
 
 void PrintHelp()
