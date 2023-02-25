@@ -41,6 +41,7 @@ struct Node
     int marked; //for BFS - whether a node has received a 
     char parentUID[CHAR_BUFFER_SIZE]; //the UID of the parent node
     char childrenUIDs[MAX_NEIGHBOURS][CHAR_BUFFER_SIZE]; // the UIDs of all children 
+    int numChildren;
 
     
     int neighbourRepliedToSearch[MAX_NEIGHBOURS];
