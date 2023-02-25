@@ -9,11 +9,13 @@ Files:
 	1) PelegsAlgorithm.c - the main program which executes PelegsAlgorithm for Leader election followed by BFS
 	2) Node.h - defines data about node necessary for execution of Pelegs algorithm and BFS 
 	3) Node.c - contains functions to display information about the node
-    4) ConfigParser.h - contains definition of function to parse valid configfiles
-    5) ConfigParser.c - contains Parse function definition to parse valid configfiles
-    6) makefile - makefile to compile PelegsAlgorithm.c
-	7) configfile.txt - a valid configfile containing the number of nodes
-    8) launcher.sh - a bash script to automatically execute PelegsAlgorithm and BFS across nodes within configfile
+    4) Message.h - contains definition of message structure for TCP/IP messages between nodes
+    5) ConfigParser.h - contains definition of function to parse valid configfiles
+    6) ConfigParser.c - contains Parse function definition to parse valid configfiles
+    7) makefile - makefile to compile PelegsAlgorithm.c
+	8) configfile.txt - a valid configfile containing the number of nodes
+    9) launcher.sh - a bash script to automatically execute PelegsAlgorithm and BFS across nodes within configfile
+    10) README.md - contains file definitions and how to execute program
 
 How to run:
     1) Manually
