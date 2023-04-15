@@ -1,6 +1,8 @@
 #ifndef NODE_H
 #define NODE_H
 
+#include "MessageQueue.h"
+
 #if !defined MAX_NEIGHBOURS
 #define MAX_NEIGHBOURS 100
 #endif
@@ -22,7 +24,6 @@ struct _Node
     int myListeningPort;
     int mySocket;
     int myLayer;
-    int currentLayer;
     enum status isDistinguished;
 
     int neighbourUIDs[MAX_NEIGHBOURS];
@@ -33,7 +34,13 @@ struct _Node
 
     int parentUID;
     int childrenUIDs[MAX_NEIGHBOURS];
+    int numChildren;
     int isMarked;
+
+    struct _MessageQueue* messageQueue;
+    struct _MessageQueue* messageQueueTailPtr;
+    int numMessagesSent;
+    int numMessagesReceived;
 
 };
 

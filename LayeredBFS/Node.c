@@ -25,5 +25,12 @@ void PrintNodeInfo(struct _Node node)
 
 void PrintBFSInfo(struct _Node nodeInfo)
 {
+	if(nodeInfo.isDistinguished == DISINGUISHED)
+	{
 
+	}
+	else
+	{
+
+	}
 }

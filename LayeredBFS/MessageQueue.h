@@ -5,7 +5,7 @@
 
 struct _MessageQueue
 {
-    struct Message msg;
+    struct _Message msg;
     struct _MessageQueue* next;
 };
 

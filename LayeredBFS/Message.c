@@ -1,6 +1,6 @@
 #include "Message.h"
 
-struct _Message CreateMessage(enum msgType messageType,uint32_t srcUID,uint32_t dstUID,uint32_t layer,uint32_t discovered)
+struct _Message CreateMessage(enum msgType messageType, uint32_t srcUID, uint32_t dstUID, uint32_t layer, uint32_t discovered, uint32_t degree)
 {
     struct _Message tmpMessage;
     tmpMessage.msgT = messageType;
@@ -8,6 +8,7 @@ struct _Message CreateMessage(enum msgType messageType,uint32_t srcUID,uint32_t 
     tmpMessage.dstUID = dstUID;
     tmpMessage.layer = layer;
     tmpMessage.discovered = discovered;
+    tmpMessage.degree = degree;
 
     return tmpMessage;
 }
