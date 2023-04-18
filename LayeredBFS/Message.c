@@ -1,3 +1,8 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "Message.h"
 
 struct _Message CreateMessage(enum msgType messageType, uint32_t srcUID, uint32_t dstUID, uint32_t layer, uint32_t discovered, uint32_t degree)

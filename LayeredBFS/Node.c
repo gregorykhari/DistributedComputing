@@ -8,10 +8,10 @@ void PrintNodeInfo(struct _Node node)
 
 	printf("\n\n");
 	printf("<%s,%s,%d>\t<<<<< NODE INFO >>>>>\n",__FILE__,__func__,__LINE__);
-    printf("<%s,%s,%d>\tnodeInfo.myUID: %d\n",__FILE__,__func__,__LINE__,node.myUID);
-	printf("<%s,%s,%d>\tnodeInfo.myHostName: %s\n",__FILE__,__func__,__LINE__,node.myHostName);
-	printf("<%s,%s,%d>\tnodeInfo.myListeningPort: %d\n",__FILE__,__func__,__LINE__,node.myListeningPort);
-    printf("<%s,%s,%d>\tnodeInfo.isDistinguished: %s\n",__FILE__,__func__,__LINE__,status_str[node.isDistinguished]);
+    printf("<%s,%s,%d>\tnode.myUID : %d\n",__FILE__,__func__,__LINE__,node.myUID);
+	printf("<%s,%s,%d>\tnode.myHostName : %s\n",__FILE__,__func__,__LINE__,node.myHostName);
+	printf("<%s,%s,%d>\tnode.myListeningPort : %d\n",__FILE__,__func__,__LINE__,node.myListeningPort);
+    printf("<%s,%s,%d>\tnode.isDistinguished : %s\n",__FILE__,__func__,__LINE__,status_str[node.isDistinguished]);
 
 	int i;
 	printf("\n<%s,%s,%d>\t----- Neighbours -----\n",__FILE__,__func__,__LINE__);
@@ -23,14 +23,37 @@ void PrintNodeInfo(struct _Node node)
 	printf("\n\n");
 }
 
-void PrintBFSInfo(struct _Node nodeInfo)
+void PrintBFSInfo(struct _Node node)
 {
-	if(nodeInfo.isDistinguished == DISINGUISHED)
+	int i;
+	printf("\n\n");
+	printf("<%s,%s,%d>\t<<<<< NODE INFO >>>>>\n",__FILE__,__func__,__LINE__);
+    printf("<%s,%s,%d>\tnode.myUID : %d\n",__FILE__,__func__,__LINE__,node.myUID);
+	printf("<%s,%s,%d>\tnode.myHostName : %s\n",__FILE__,__func__,__LINE__,node.myHostName);
+	printf("<%s,%s,%d>\tnode.myListeningPort : %d\n",__FILE__,__func__,__LINE__,node.myListeningPort);
+    printf("<%s,%s,%d>\tnode.isDistinguished : %s\n",__FILE__,__func__,__LINE__,status_str[node.isDistinguished]);
+	printf("<%s,%s,%d>\tnode.distanceFromDistinguishedNode : %d\n",__FILE__,__func__,__LINE__,node.myLayer);
+	if(DISINGUISHED == node.isDistinguished)
 	{
-
+		printf("<%s,%s,%d>\tnode.parentUID : NULL\n",__FILE__,__func__,__LINE__);
 	}
 	else
 	{
-
+		printf("<%s,%s,%d>\tnode.parentUID : %d\n",__FILE__,__func__,__LINE__,node.parentUID);
+	}
+	printf("<%s,%s,%d>\tnode.childrenUIDs : {",__FILE__,__func__,__LINE__);
+	for(i = 0; i < node.numChildren; i++)
+	{
+		printf("%d\t",node.childrenUIDs[i]);
+	}
+	printf(" }\n");
+	if(DISINGUISHED == node.isDistinguished)
+	{
+		printf("<%s,%s,%d>\tnode.degree : %d\n",__FILE__,__func__,__LINE__,node.numChildren);
+		printf("<%s,%s,%d>\tnode.maxChildDegree : %d\n",__FILE__,__func__,__LINE__,node.maxChildDegree);
+	}
+	else
+	{
+		printf("<%s,%s,%d>\tnode.degree : %d\n",__FILE__,__func__,__LINE__,(node.numChildren + 1));
 	}
 }

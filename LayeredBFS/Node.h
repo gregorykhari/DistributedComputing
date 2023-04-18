@@ -32,10 +32,13 @@ struct _Node
     int neighbourEdgeWeights[MAX_NEIGHBOURS];
     int numNeighbours;
 
+    int currentLayer;
     int parentUID;
     int childrenUIDs[MAX_NEIGHBOURS];
     int numChildren;
     int isMarked;
+    int maxChildDegree;
+    int terminationDetected;
 
     struct _MessageQueue* messageQueue;
     struct _MessageQueue* messageQueueTailPtr;

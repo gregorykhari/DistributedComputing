@@ -65,7 +65,7 @@ int ResolveHostnameToIP(char * hostname , char* ip)
 	if ((he = gethostbyname( hostname )) == NULL) 
 	{
 		// get the host info
-		printf("<%s,%s,%d>\tFailed to Get Host Address List!",__FILE__,__func__,__LINE__);
+		printf("<%s,%s,%d>\tFailed to Get Host Address List For %s !\n",__FILE__,__func__,__LINE__,hostname);
 		return 1;
 	}
 
@@ -116,7 +116,7 @@ int CreateSocket(int port)
     return node_socket;
 }
 
-int ConnectToNode(char* hostName, int port)
+int ConnectToNode(int uid, char* hostName, int port)
 {
 	int error_code;
 	int nodeSocket;
@@ -124,7 +124,7 @@ int ConnectToNode(char* hostName, int port)
 
     if(1 == ResolveHostnameToIP(hostName,ipAddr))
     {
-        printf("<%s,%s,%d>\tFailed to Resolve Hostname %s to IPAddress!\n",__FILE__,__func__,__LINE__,hostName);
+        printf("<%s,%s,%d>\tFailed to Resolve Hostname %s For Node with UID %d to IPAddress!\n",__FILE__,__func__,__LINE__,hostName,uid);
         exit(1);
     }
     else
@@ -135,18 +135,18 @@ int ConnectToNode(char* hostName, int port)
     if(0 == ValidateIPAddress(ipAddr))
     {
         printf("<%s,%s,%d>\tIP Adress %s is not in expected format of X.X.X.X !\n",__FILE__,__func__,__LINE__,ipAddr);
-        printf("<%s,%s,%d>\tFailed to Connect to Node!",__FILE__,__func__,__LINE__);
+        printf("<%s,%s,%d>\tFailed to Connect to Node With UID %d!",__FILE__,__func__,__LINE__,uid);
         exit(1);
     }
 
     if(0 == ValidatePort(port))
     {
         printf("<%s,%s,%d>\tPort %d not within valid range of 1024 to 65535!\n",__FILE__,__func__,__LINE__,port);
-        printf("<%s,%s,%d>\tFailed to Connect to Node!\n",__FILE__,__func__,__LINE__);
+        printf("<%s,%s,%d>\tFailed to Connect to Node With UID %d!\n",__FILE__,__func__,__LINE__,uid);
         exit(1);
     }
 
-	printf("<%s,%s,%d>\tAttempting to Connect to IP Adress %s on Port %d!\n",__FILE__,__func__,__LINE__,ipAddr,port);
+	printf("<%s,%s,%d>\tAttempting to Connect to Node With UID %d At IP Adress %s on Port %d!\n",__FILE__,__func__,__LINE__,uid,ipAddr,port);
 
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET; //specified for IPv4 connection
@@ -165,6 +165,7 @@ int ConnectToNode(char* hostName, int port)
     error_code = connect(nodeSocket,(struct sockaddr *)&server_addr,sizeof(server_addr));
     if (error_code != 0)
     {
+		printf("<%s,%s,%d>\tFailed to Connect to Node With UID %d. Error Code: %d !\n",__FILE__,__func__,__LINE__,uid,error_code);
         close(nodeSocket);
         return 0;
     }
@@ -178,5 +179,5 @@ int ConnectToNode(char* hostName, int port)
 
 int CloseConnection(int nodeSocket)
 {
-    return 0;
+    return close(nodeSocket);
 }

@@ -5,6 +5,8 @@
 
 enum msgType {NEW_PHASE, SEARCH, ACK, NACK, TERMINATE, INFO};
 
+static const char* msgType_str[] = {"NEW_PHASE", "SEARCH", "ACK", "NACK", "TERMINATE", "INFO"};
+
 struct _Message{
     uint32_t srcUID;
     uint32_t dstUID;
