@@ -19,6 +19,7 @@
 static struct _Node node;
 static int discoveredNewNode = 0;
 static int currentLayer = 0;
+static pthread_mutex_t lock;
 
 void PrintHelp();
 
@@ -36,6 +37,9 @@ void HandleTerminate(struct _Message);
 void HandleInfo(struct _Message);
 
 int getNeighbourIndex(int);
+int receivedAllReplies();
+void ResetReplies();
+void PrintReplies();
 
 void LayeredBFS()
 {
@@ -46,22 +50,23 @@ void LayeredBFS()
 
 	while(1)
 	{
-		node.numMessagesSent = node.numMessagesReceived = 0;
+		printf("<%s,%s,%d>\tBuilding Layer %d Of LayeredBFS Spanning Tree",__FILE__,__func__,__LINE__,currentLayer);
+		ResetReplies();
 
 		int msgType = (1 == currentLayer) ? SEARCH : NEW_PHASE;
 
 		for(i = 0; i < node.numNeighbours; i++)
 		{
 			//create next layer 
-			struct _Message msg = CreateMessage(msgType,node.myUID,node.neighbourUIDs[i],currentLayer,0,0);
-			SendMessage(msg);
-			node.numMessagesSent = node.numMessagesSent + 1;
+			struct _Message send_msg = CreateMessage(msgType,node.myUID,node.neighbourUIDs[i],currentLayer,0,0);
+			SendMessage(send_msg);
 		}
 
 		//wait to receive ACKs\NACKs for NEW_PHASE from all children
-		while(node.numMessagesSent > node.numMessagesReceived)
+		while(0 == receivedAllReplies())
 		{
-			sleep(1);
+			PrintReplies();
+			sleep(0.5);
 		}
 
 		if(0 == discoveredNewNode)
@@ -82,8 +87,8 @@ void TerminateLayeredBFS()
 	for(i = 0; i < node.numChildren; i++)
 	{
 		//create next layer 
-		struct _Message msg = CreateMessage(TERMINATE, node.myUID, node.childrenUIDs[i], currentLayer, 0,0);
-		SendMessage(msg);
+		struct _Message send_msg = CreateMessage(TERMINATE, node.myUID, node.childrenUIDs[i], currentLayer, 0,0);
+		SendMessage(send_msg);
 	}
 }
 
@@ -131,7 +136,7 @@ void AcceptConnections()
 		}
 		else
 		{
-			printf("<%s,%s,%d>\tReceived %s Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.srcUID,node_socket);
+			printf("<%s,%s,%d>\tReceived %s(%d) Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.layer,recv_msg.srcUID,node_socket);
 			AddMessageToQueue(recv_msg);
 		}
 		close(node_socket);
@@ -140,6 +145,7 @@ void AcceptConnections()
 
 void AddMessageToQueue(struct _Message recv_msg)
 {
+	pthread_mutex_lock(&lock);
 	struct _MessageQueue* tmp = (struct _MessageQueue*) malloc(sizeof(struct _MessageQueue));
 	tmp -> msg = recv_msg;
 	tmp -> next = NULL;
@@ -153,25 +159,27 @@ void AddMessageToQueue(struct _Message recv_msg)
 		node.messageQueueTailPtr -> next = tmp;
 		node.messageQueueTailPtr = node.messageQueueTailPtr -> next;
 	}
+	pthread_mutex_unlock(&lock);
 }
 
 void SendMessage(struct _Message msg)
 {
-	printf("<%s,%s,%d>\tSending %s Message to Node With UID %d\n", __FILE__, __func__, __LINE__, msgType_str[msg.msgT],msg.dstUID);
 
 	int idx = getNeighbourIndex(msg.dstUID);
+
+	//PrintMessage(msg);
 
 	int nodeSocket = ConnectToNode(msg.dstUID ,node.neighbourHostNames[idx],node.neighbourListeningPorts[idx]);
 	
     int error_code = send(nodeSocket, &msg, sizeof(msg),0);
     if(error_code < 0)
     {
-        printf("<%s,%s,%d>\tFailed to Send %s Message to Node With UID %d On Socket %d! Error_Code: %d\n", __FILE__, __func__, __LINE__, msgType_str[msg.msgT],msg.dstUID, nodeSocket,error_code);
+        printf("<%s,%s,%d>\tFailed to Send %s(%d) Message to Node With UID %d On Socket %d! Error_Code: %d\n", __FILE__, __func__, __LINE__, msgType_str[msg.msgT],msg.layer,msg.dstUID, nodeSocket,error_code);
         exit(1);
     }
     else
     {
-        printf("<%s,%s,%d>\tSuccessfully Sent %s Message to Node With UID %d On Socket %d\n", __FILE__, __func__, __LINE__, msgType_str[msg.msgT],msg.dstUID, nodeSocket);
+        printf("<%s,%s,%d>\tSuccessfully Sent %s(%d) Message to Node With UID %d On Socket %d\n", __FILE__, __func__, __LINE__, msgType_str[msg.msgT],msg.layer,msg.dstUID, nodeSocket);
     }
 }
 
@@ -189,7 +197,7 @@ void HandleMessages()
 		}
 		else
 		{
-			printf("<%s,%s,%d>\tProcessing %s Message Sent From Node With UID %d \n", __FILE__, __func__, __LINE__, msgType_str[messageQueuePtr->msg.msgT],messageQueuePtr->msg.srcUID);
+			printf("<%s,%s,%d>\tProcessing %s(%d) Message Sent From Node With UID %d \n", __FILE__, __func__, __LINE__, msgType_str[messageQueuePtr->msg.msgT],messageQueuePtr->msg.layer,messageQueuePtr->msg.srcUID);
 
 			switch(messageQueuePtr->msg.msgT)
 			{
@@ -222,6 +230,8 @@ void HandleMessages()
 				
 			}
 
+			pthread_mutex_lock(&lock);
+
 			//save reference to first link
 			struct _MessageQueue *temp = messageQueuePtr;
 		
@@ -231,6 +241,8 @@ void HandleMessages()
 			//return the deleted link
 			free(temp);
 			temp = NULL;
+
+			pthread_mutex_unlock(&lock);
 		}
     }
 }
@@ -238,30 +250,21 @@ void HandleMessages()
 void HandleNewPhase(struct _Message msg)
 {
 	discoveredNewNode = 0;
+	//send search message to all neighbours except node we received new_phase from
+	ResetReplies();
+	node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
 
 	if(msg.layer == node.myLayer + 1)
 	{
-		//send search message to all neighbours except node we received new_phase from
-		node.numMessagesSent = node.numMessagesReceived = 0;
-
 		int i;
 		for(i = 0; i < node.numNeighbours; i++)
 		{
-			if(node.neighbourUIDs[i] != msg.srcUID)
+			if(node.neighbourUIDs[i] != node.parentUID)
 			{
-				struct _Message send_msg = CreateMessage(SEARCH,node.myUID,msg.srcUID,msg.layer,0,0);
+				struct _Message send_msg = CreateMessage(SEARCH,node.myUID,node.neighbourUIDs[i],msg.layer,0,0);
 				SendMessage(send_msg);
 			}
 		}
-
-		//wait for ACKs and NACKs 
-		while(node.numMessagesSent > node.numMessagesReceived)
-		{
-			sleep(1);
-		}
-
-		struct _Message send_msg = CreateMessage(ACK,node.myUID,msg.srcUID,msg.layer,discoveredNewNode,0);
-		SendMessage(send_msg);
 	}
 	else
 	{
@@ -273,14 +276,24 @@ void HandleNewPhase(struct _Message msg)
 			SendMessage(send_msg);
 		}
 	}
+
+	//wait for ACKs and NACKs 
+	while(0 == receivedAllReplies())
+	{
+		PrintReplies();
+		sleep(0.5);
+	}
+
+	struct _Message send_msg = CreateMessage(NACK,node.myUID,msg.srcUID,msg.layer,discoveredNewNode,0);
+	SendMessage(send_msg);
 }
 
 void HandleSearch(struct _Message msg)
 {
-	if(0 == node.isMarked)
+	if(1 == node.isMarked)
 	{
-		struct _Message msg = CreateMessage(NACK,node.myUID,msg.srcUID,msg.layer,0,0);
-		SendMessage(msg);
+		struct _Message send_msg = CreateMessage(NACK,node.myUID,msg.srcUID,msg.layer,0,0);
+		SendMessage(send_msg);
 	}
 	else
 	{
@@ -290,14 +303,14 @@ void HandleSearch(struct _Message msg)
 		node.myLayer = msg.layer;
 		discoveredNewNode = 1;
 
-		struct _Message send_msg = CreateMessage(ACK,node.myUID,msg.srcUID,msg.layer,discoveredNewNode,0);
+		struct _Message send_msg = CreateMessage(ACK,node.myUID,msg.srcUID,msg.layer,1,0);
 		SendMessage(send_msg);
 	}
 }
 
 void HandleACK(struct _Message msg)
 {
-	node.numMessagesReceived = node.numMessagesReceived + 1;
+	node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
 
 	//put childUID in first available slot marked for children
 	int i;
@@ -323,13 +336,14 @@ void HandleACK(struct _Message msg)
 
 void HandleNACK(struct _Message msg)
 {
-	node.numMessagesReceived = node.numMessagesReceived + 1;
+	node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
 }
 
 void HandleTerminate(struct _Message msg)
 {
-	node.numMessagesSent = node.numMessagesReceived = 0;
-
+	ResetReplies();
+	node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
+	
 	int i;
 	
 	for(i = 0; i < node.numChildren; i++)
@@ -338,21 +352,23 @@ void HandleTerminate(struct _Message msg)
 		SendMessage(send_msg);
 	}
 
-	while(node.numMessagesSent > node.numMessagesReceived)
+	//wait for INFOs
+	while(0 == receivedAllReplies())
 	{
-		sleep(1);
+		PrintReplies();
+		sleep(0.5);
 	}
 
 	int nodeDegree = node.numChildren + 1;
 	int maxDegree = (nodeDegree > node.maxChildDegree) ? nodeDegree : node.maxChildDegree;
 
-	struct _Message send_msg = CreateMessage(INFO,node.myUID,msg.srcUID,msg.layer,discoveredNewNode,maxDegree);
+	struct _Message send_msg = CreateMessage(INFO,node.myUID,msg.srcUID,msg.layer,0,maxDegree);
 	SendMessage(send_msg);
 }
 
 void HandleInfo(struct _Message msg)
 {
-	node.numMessagesReceived = node.numMessagesReceived + 1;
+	node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
 
 	if(msg.degree > node.maxChildDegree)
 	{
@@ -363,6 +379,40 @@ void HandleInfo(struct _Message msg)
 		//do nothing
 	}
 }
+
+int receivedAllReplies()
+{	
+	int i;
+	for(i = 0; i < node.numNeighbours; i++)
+	{
+		if(0 == node.neighbourReplies[i])
+		{
+			return 0;
+		}
+	}
+	return 1;
+}
+
+void ResetReplies()
+{
+	int i;
+	for(i = 0; i < node.numNeighbours; i++)
+	{
+		node.neighbourReplies[i] = 0;
+	}
+}
+
+void PrintReplies()
+{
+	int i;
+	printf("<%s,%s,%d> node.neighbourReplies[] : { ",__FILE__,__func__,__LINE__);
+	for(i = 0; i < node.numNeighbours; i++)
+	{
+		printf("%d\t",node.neighbourReplies[i]);
+	}
+	printf("}\n");
+}
+
 
 int getNeighbourIndex(int uid)
 {
@@ -385,6 +435,7 @@ void InitNode(char* pathToConfig,char* myUID)
 	node.parentUID = -1;
 	node.isMarked = 0;
 	node.numChildren = 0;
+	node.maxChildDegree = 0;
 	node.messageQueue = NULL;
 	node.messageQueueTailPtr = NULL;
 	node.terminationDetected = 0;

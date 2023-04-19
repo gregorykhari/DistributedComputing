@@ -17,3 +17,13 @@ struct _Message CreateMessage(enum msgType messageType, uint32_t srcUID, uint32_
 
     return tmpMessage;
 }
+
+void PrintMessage(struct _Message msg)
+{
+    printf("<%s,%s,%d> {%d,",__FILE__,__func__,__LINE__,msg.msgT);
+    printf("%d,",msg.srcUID);
+    printf("%d,",msg.dstUID);
+    printf("%d,",msg.layer);
+    printf("%d,",msg.discovered);
+    printf("%d}\n",msg.degree);
+}

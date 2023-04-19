@@ -19,4 +19,6 @@ struct _Message{
 
 struct _Message CreateMessage(enum msgType messageType, uint32_t srcUID, uint32_t dstUID, uint32_t layer, uint32_t discovered, uint32_t degree);
 
+void PrintMessage(struct _Message msg);
+
 #endif

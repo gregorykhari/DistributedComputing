@@ -118,6 +118,8 @@ int CreateSocket(int port)
 
 int ConnectToNode(int uid, char* hostName, int port)
 {
+	//printf("<%s,%s,%d>\tAttempting To Connect To Node With UID %d With Hostname %s On Port %d\n", __FILE__, __func__, __LINE__,uid,hostName,port);
+
 	int error_code;
 	int nodeSocket;
     char ipAddr[100];
