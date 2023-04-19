@@ -19,7 +19,6 @@
 static struct _Node node;
 static int discoveredNewNode = 0;
 static int currentLayer = 0;
-static pthread_mutex_t lock;
 
 void PrintHelp();
 
@@ -66,7 +65,7 @@ void LayeredBFS()
 		while(0 == receivedAllReplies())
 		{
 			PrintReplies();
-			sleep(0.5);
+			sleep(1);
 		}
 
 		if(0 == discoveredNewNode)
@@ -145,7 +144,6 @@ void AcceptConnections()
 
 void AddMessageToQueue(struct _Message recv_msg)
 {
-	pthread_mutex_lock(&lock);
 	struct _MessageQueue* tmp = (struct _MessageQueue*) malloc(sizeof(struct _MessageQueue));
 	tmp -> msg = recv_msg;
 	tmp -> next = NULL;
@@ -159,7 +157,6 @@ void AddMessageToQueue(struct _Message recv_msg)
 		node.messageQueueTailPtr -> next = tmp;
 		node.messageQueueTailPtr = node.messageQueueTailPtr -> next;
 	}
-	pthread_mutex_unlock(&lock);
 }
 
 void SendMessage(struct _Message msg)
@@ -230,8 +227,6 @@ void HandleMessages()
 				
 			}
 
-			pthread_mutex_lock(&lock);
-
 			//save reference to first link
 			struct _MessageQueue *temp = messageQueuePtr;
 		
@@ -241,8 +236,6 @@ void HandleMessages()
 			//return the deleted link
 			free(temp);
 			temp = NULL;
-
-			pthread_mutex_unlock(&lock);
 		}
     }
 }
@@ -281,7 +274,7 @@ void HandleNewPhase(struct _Message msg)
 	while(0 == receivedAllReplies())
 	{
 		PrintReplies();
-		sleep(0.5);
+		sleep(1);
 	}
 
 	struct _Message send_msg = CreateMessage(NACK,node.myUID,msg.srcUID,msg.layer,discoveredNewNode,0);
@@ -356,7 +349,7 @@ void HandleTerminate(struct _Message msg)
 	while(0 == receivedAllReplies())
 	{
 		PrintReplies();
-		sleep(0.5);
+		sleep(1);
 	}
 
 	int nodeDegree = node.numChildren + 1;
