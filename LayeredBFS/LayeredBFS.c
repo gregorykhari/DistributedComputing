@@ -70,11 +70,14 @@ void LayeredBFS()
 
 		if(0 == discoveredNewNode)
 		{
+			printf("<%s,%s,%d>\tNo New Nodes Discovered In Network For Layer %d!\n",__FILE__,__func__,__LINE__,currentLayer);
+			printf("<%s,%s,%d>\tTerminating LayeredBFS!\n",__FILE__,__func__,__LINE__,currentLayer);
     		TerminateLayeredBFS();
 			break;
 		}
 		else
 		{
+			printf("<%s,%s,%d>\tAt Least 1 New Node Discovered In Network For Layer %d!\n",__FILE__,__func__,__LINE__,currentLayer);
 			currentLayer = currentLayer + 1;
 		}
 	}
@@ -88,6 +91,7 @@ void TerminateLayeredBFS()
 		//create next layer 
 		struct _Message send_msg = CreateMessage(TERMINATE, node.myUID, node.childrenUIDs[i], currentLayer, 0,0);
 		SendMessage(send_msg);
+		node.outstandingMessageReplies = node.outstandingMessageReplies + 1;
 	}
 }
 
@@ -401,17 +405,20 @@ void HandleInfo(struct _Message msg)
 
 	if(1 == receivedAllReplies())
 	{
+		int nodeDegree = node.numChildren + 1;
+		int maxDegree = (nodeDegree > node.maxChildDegree) ? nodeDegree : node.maxChildDegree;
+		
 		if(NON_DISTINGUISHED == node.isDistinguished)
 		{
-			int nodeDegree = node.numChildren + 1;
-			int maxDegree = (nodeDegree > node.maxChildDegree) ? nodeDegree : node.maxChildDegree;
 			struct _Message send_msg = CreateMessage(INFO,node.myUID,node.parentUID,msg.layer,0,maxDegree);
 			SendMessage(send_msg);
 		}
 		else
 		{
-			node.terminationDetected = 1;
+			//do nothing
 		}
+
+		node.terminationDetected = 1;
 	}
 	else
 	{
