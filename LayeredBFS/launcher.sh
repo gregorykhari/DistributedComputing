@@ -12,11 +12,11 @@ CONFIG_LOCAL=/Users/gregoryhinkson/Projects/DistributedComputing/LayeredBFS/conf
 
 n=0
 
-cat $CONFIG_LOCAL | sed -e "s/#.*//" | sed -e "/^\s*$/d" |
+cat "$CONFIG_LOCAL" | sed -e "s/#.*//" | sed -e "/^\s*$/d" |
 (
     read i
     echo $i
-    while [[ $n < $i ]]
+    while [[ $n -lt $i ]]
     do
     	read line
     	p=$( echo $line | awk '{ print $1 }' )

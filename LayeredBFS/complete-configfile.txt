@@ -1,0 +1,31 @@
+#
+# Configuration file for CS 6380 Project 3 (Spring 2023)
+#
+# As per the “shell” convention, anything following a hash sign is
+# a comment and should be ignored by the parser.
+#
+# Number of nodes
+5
+# Here we list the individual nodes
+#
+# Format is:
+# UID Hostname Port
+5 dc02.utdallas.edu 5734
+200 dc03.utdallas.edu 6713
+8 dc04.utdallas.edu 4723
+184 dc05.utdallas.edu 3762
+9 dc02.utdallas.edu 4793
+# List of edges and their weight, one per line. An edge is denoted
+# by (smaller UID, larger UID)
+(5,200) 1
+(5,184) 1
+(5,8) 1
+(5,9) 1
+(8,200) 1
+(8,184) 1
+(8,9) 1
+(9,200) 1
+(9,184) 1
+(184,200) 1
+# Distinguished node UID
+9

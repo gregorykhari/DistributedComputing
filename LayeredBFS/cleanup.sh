@@ -29,7 +29,7 @@ cat "$CONFIG_LOCAL" | sed -e "s/#.*//" | sed -e "/^\s*$/d" |
                 tell app "Terminal"
                     do script "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no '$netid@$host'  killall -u '$netid'"
                 end tell'
-        sleep 1
+        sleep 0.2
 
         n=$(( n + 1 ))
     done

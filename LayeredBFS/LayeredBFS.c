@@ -48,7 +48,7 @@ void LayeredBFS()
 	{
 		discoveredNewNode = 0;
 
-		printf("<%s,%s,%d>\tBuilding Layer %d Of LayeredBFS Spanning Tree!\n",__FILE__,__func__,__LINE__,currentLayer);
+		printf("\n\n<%s,%s,%d>\tBuilding Layer %d Of LayeredBFS Spanning Tree!\n",__FILE__,__func__,__LINE__,currentLayer);
 		ResetReplies();
 
 		int msgType = (1 == currentLayer) ? SEARCH : NEW_PHASE;
@@ -70,7 +70,7 @@ void LayeredBFS()
 		if(0 == discoveredNewNode)
 		{
 			printf("<%s,%s,%d>\tNo New Nodes Discovered In Network For Layer %d!\n",__FILE__,__func__,__LINE__,currentLayer);
-			printf("<%s,%s,%d>\tTerminating LayeredBFS!\n",__FILE__,__func__,__LINE__,currentLayer);
+			printf("\n\n<%s,%s,%d>\tTerminating LayeredBFS!\n",__FILE__,__func__,__LINE__,currentLayer);
     		TerminateLayeredBFS();
 			break;
 		}
@@ -251,14 +251,22 @@ void HandleNewPhase(struct _Message msg)
 
 	if(msg.layer == node.myLayer + 1)
 	{
-		int i;
-		for(i = 0; i < node.numNeighbours; i++)
+		if(1 == node.numNeighbours)
 		{
-			if(node.neighbourUIDs[i] != node.parentUID)
+			struct _Message send_msg = CreateMessage(NACK,node.myUID,msg.srcUID,msg.layer,0,0);
+			SendMessage(send_msg);
+		}
+		else
+		{
+			int i;
+			for(i = 0; i < node.numNeighbours; i++)
 			{
-				struct _Message send_msg = CreateMessage(SEARCH,node.myUID,node.neighbourUIDs[i],msg.layer,0,0);
-				SendMessage(send_msg);
-				node.outstandingMessageReplies = node.outstandingMessageReplies + 1;
+				if(node.neighbourUIDs[i] != node.parentUID)
+				{
+					struct _Message send_msg = CreateMessage(SEARCH,node.myUID,node.neighbourUIDs[i],msg.layer,0,0);
+					SendMessage(send_msg);
+					node.outstandingMessageReplies = node.outstandingMessageReplies + 1;
+				}
 			}
 		}
 	}
@@ -306,8 +314,6 @@ void HandleSearch(struct _Message msg)
 
 void HandleACK(struct _Message msg)
 {
-	//node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
-	//node.numMessagesReceived = node.numMessagesReceived + 1;
 	node.outstandingMessageReplies = node.outstandingMessageReplies - 1;
 
 	//put childUID in first available slot marked for children
@@ -318,6 +324,7 @@ void HandleACK(struct _Message msg)
 		{
 			node.childrenUIDs[i] = msg.srcUID;
 			node.numChildren = node.numChildren + 1;
+			node.maxDegree = node.numChildren;
 			break;
 		}
 	}
@@ -456,7 +463,7 @@ void InitNode(char* pathToConfig,char* myUID)
 	node.parentUID = -1;
 	node.isMarked = 0;
 	node.numChildren = 0;
-	node.maxChildDegree = 0;
+	node.maxDegree = 0;
 	node.messageQueue = NULL;
 	node.messageQueueTailPtr = NULL;
 	node.terminationDetected = 0;
