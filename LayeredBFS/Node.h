@@ -42,7 +42,7 @@ struct _Node
 
     struct _MessageQueue* messageQueue;
     struct _MessageQueue* messageQueueTailPtr;
-    int neighbourReplies[MAX_NEIGHBOURS];
+    int outstandingMessageReplies;
 
 };
 

@@ -148,7 +148,7 @@ int ConnectToNode(int uid, char* hostName, int port)
         exit(1);
     }
 
-	printf("<%s,%s,%d>\tAttempting to Connect to Node With UID %d At IP Adress %s on Port %d!\n",__FILE__,__func__,__LINE__,uid,ipAddr,port);
+	printf("<%s,%s,%d>\tAttempting to Connect to Node With UID %d!\n",__FILE__,__func__,__LINE__,uid);//ipAddr,port);
 
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET; //specified for IPv4 connection
@@ -173,7 +173,7 @@ int ConnectToNode(int uid, char* hostName, int port)
     }
     else
     {
-        printf("<%s,%s,%d>\tSuccessfully Established Connection to Node At IPAddress %s on Port %d With Socket %d!\n",__FILE__,__func__,__LINE__,ipAddr,port,nodeSocket);
+        printf("<%s,%s,%d>\tSuccessfully Established Connection to Node %d!\n",__FILE__,__func__,__LINE__,uid);
     }
 
     return nodeSocket;

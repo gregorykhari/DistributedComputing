@@ -38,18 +38,18 @@ void HandleInfo(struct _Message);
 int getNeighbourIndex(int);
 int receivedAllReplies();
 void ResetReplies();
-void PrintReplies();
+//void PrintReplies();
 
 void LayeredBFS()
 {
 	int i;
 	int currentLayer = 1;
-	
-	discoveredNewNode = 0;
 
 	while(1)
 	{
-		printf("<%s,%s,%d>\tBuilding Layer %d Of LayeredBFS Spanning Tree",__FILE__,__func__,__LINE__,currentLayer);
+		discoveredNewNode = 0;
+
+		printf("<%s,%s,%d>\tBuilding Layer %d Of LayeredBFS Spanning Tree!\n",__FILE__,__func__,__LINE__,currentLayer);
 		ResetReplies();
 
 		int msgType = (1 == currentLayer) ? SEARCH : NEW_PHASE;
@@ -59,12 +59,12 @@ void LayeredBFS()
 			//create next layer 
 			struct _Message send_msg = CreateMessage(msgType,node.myUID,node.neighbourUIDs[i],currentLayer,0,0);
 			SendMessage(send_msg);
+			node.outstandingMessageReplies = node.outstandingMessageReplies + 1;
 		}
 
 		//wait to receive ACKs\NACKs for NEW_PHASE from all children
 		while(0 == receivedAllReplies())
 		{
-			PrintReplies();
 			sleep(1);
 		}
 
@@ -122,7 +122,7 @@ void AcceptConnections()
 		else
 		{
 			//do nothing
-			printf("<%s,%s,%d>\tSuccessfully Accepted Incoming Connection with Neighbour at socket %d!\n",__FILE__,__func__,__LINE__,node_socket);
+			printf("<%s,%s,%d>\tSuccessfully Accepted Incoming Connection with Neighbour !\n",__FILE__,__func__,__LINE__);
 		}
 
 		memset(recv_buffer,'\0',sizeof(recv_buffer));
@@ -135,7 +135,7 @@ void AcceptConnections()
 		}
 		else
 		{
-			printf("<%s,%s,%d>\tReceived %s(%d) Message from Neighbour with UID %d on Socket %d\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.layer,recv_msg.srcUID,node_socket);
+			printf("<%s,%s,%d>\tReceived %s(%d) Message from Neighbour with UID %d!\n",__FILE__,__func__,__LINE__,msgType_str[recv_msg.msgT],recv_msg.layer,recv_msg.srcUID);
 			AddMessageToQueue(recv_msg);
 		}
 		close(node_socket);
@@ -151,6 +151,7 @@ void AddMessageToQueue(struct _Message recv_msg)
 	if(NULL == node.messageQueue)
 	{
 		node.messageQueue = tmp;
+		node.messageQueueTailPtr = tmp;
 	}
 	else
 	{
@@ -164,8 +165,6 @@ void SendMessage(struct _Message msg)
 
 	int idx = getNeighbourIndex(msg.dstUID);
 
-	//PrintMessage(msg);
-
 	int nodeSocket = ConnectToNode(msg.dstUID ,node.neighbourHostNames[idx],node.neighbourListeningPorts[idx]);
 	
     int error_code = send(nodeSocket, &msg, sizeof(msg),0);
@@ -177,7 +176,7 @@ void SendMessage(struct _Message msg)
     else
     {
         printf("<%s,%s,%d>\tSuccessfully Sent %s(%d) Message to Node With UID %d On Socket %d\n", __FILE__, __func__, __LINE__, msgType_str[msg.msgT],msg.layer,msg.dstUID, nodeSocket);
-    }
+	}
 }
 
 void HandleMessages()
@@ -243,9 +242,9 @@ void HandleMessages()
 void HandleNewPhase(struct _Message msg)
 {
 	discoveredNewNode = 0;
+
 	//send search message to all neighbours except node we received new_phase from
 	ResetReplies();
-	node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
 
 	if(msg.layer == node.myLayer + 1)
 	{
@@ -256,29 +255,30 @@ void HandleNewPhase(struct _Message msg)
 			{
 				struct _Message send_msg = CreateMessage(SEARCH,node.myUID,node.neighbourUIDs[i],msg.layer,0,0);
 				SendMessage(send_msg);
+				node.outstandingMessageReplies = node.outstandingMessageReplies + 1;
 			}
 		}
 	}
 	else
 	{
-		//rebroadcast message to all my children
-		int i;
-		for(i = 0; i < node.numChildren; i++)
+		if(0 == node.numChildren)
 		{
-			struct _Message send_msg = CreateMessage(NEW_PHASE,node.myUID,node.childrenUIDs[i],msg.layer,0,0);
+			struct _Message send_msg = CreateMessage(NACK,node.myUID,msg.srcUID,msg.layer,0,0);
 			SendMessage(send_msg);
 		}
+		else
+		{
+			//rebroadcast message to all my children
+			int i;
+			for(i = 0; i < node.numChildren; i++)
+			{
+				struct _Message send_msg = CreateMessage(NEW_PHASE,node.myUID,node.childrenUIDs[i],msg.layer,0,0);
+				SendMessage(send_msg);
+				node.outstandingMessageReplies = node.outstandingMessageReplies + 1;
+			}
+		}
+		
 	}
-
-	//wait for ACKs and NACKs 
-	while(0 == receivedAllReplies())
-	{
-		PrintReplies();
-		sleep(1);
-	}
-
-	struct _Message send_msg = CreateMessage(NACK,node.myUID,msg.srcUID,msg.layer,discoveredNewNode,0);
-	SendMessage(send_msg);
 }
 
 void HandleSearch(struct _Message msg)
@@ -303,7 +303,9 @@ void HandleSearch(struct _Message msg)
 
 void HandleACK(struct _Message msg)
 {
-	node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
+	//node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
+	//node.numMessagesReceived = node.numMessagesReceived + 1;
+	node.outstandingMessageReplies = node.outstandingMessageReplies - 1;
 
 	//put childUID in first available slot marked for children
 	int i;
@@ -325,43 +327,68 @@ void HandleACK(struct _Message msg)
 	{
 		//do nothing
 	}
+
+	if((1 == receivedAllReplies()) && (NON_DISTINGUISHED == node.isDistinguished))
+	{
+		struct _Message send_msg = CreateMessage(NACK,node.myUID,node.parentUID,msg.layer,discoveredNewNode,0);
+		SendMessage(send_msg);
+	}
+	else
+	{
+		//do nothing - wait for ACKs and NACKs 
+	}
 }
 
 void HandleNACK(struct _Message msg)
 {
-	node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
+	node.outstandingMessageReplies = node.outstandingMessageReplies - 1;
+
+	if(1 == msg.discovered)
+	{
+		discoveredNewNode = 1;
+	}
+	else
+	{
+		//do nothing
+	}
+
+	if((1 == receivedAllReplies()) && (NON_DISTINGUISHED == node.isDistinguished))
+	{
+		struct _Message send_msg = CreateMessage(NACK,node.myUID,node.parentUID,msg.layer,discoveredNewNode,0);
+		SendMessage(send_msg);
+	}
+	else
+	{
+		//do nothing - wait for ACKs and NACKs 
+	}
 }
 
 void HandleTerminate(struct _Message msg)
 {
 	ResetReplies();
-	node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
-	
+
 	int i;
 	
-	for(i = 0; i < node.numChildren; i++)
+	if(node.numChildren > 0)
 	{
-		struct _Message send_msg = CreateMessage(TERMINATE,node.myUID,msg.srcUID,msg.layer,0,0);
+		for(i = 0; i < node.numChildren; i++)
+		{
+			struct _Message send_msg = CreateMessage(TERMINATE,node.myUID,node.childrenUIDs[i],msg.layer,0,0);
+			SendMessage(send_msg);
+			node.outstandingMessageReplies = node.outstandingMessageReplies + 1;
+		}
+	}
+	else
+	{
+		struct _Message send_msg = CreateMessage(INFO,node.myUID,msg.srcUID,msg.layer,0,1);
 		SendMessage(send_msg);
+		node.terminationDetected = 1;
 	}
-
-	//wait for INFOs
-	while(0 == receivedAllReplies())
-	{
-		PrintReplies();
-		sleep(1);
-	}
-
-	int nodeDegree = node.numChildren + 1;
-	int maxDegree = (nodeDegree > node.maxChildDegree) ? nodeDegree : node.maxChildDegree;
-
-	struct _Message send_msg = CreateMessage(INFO,node.myUID,msg.srcUID,msg.layer,0,maxDegree);
-	SendMessage(send_msg);
 }
 
 void HandleInfo(struct _Message msg)
 {
-	node.neighbourReplies[getNeighbourIndex(msg.srcUID)] = 1;
+	node.outstandingMessageReplies = node.outstandingMessageReplies - 1;
 
 	if(msg.degree > node.maxChildDegree)
 	{
@@ -371,41 +398,36 @@ void HandleInfo(struct _Message msg)
 	{
 		//do nothing
 	}
+
+	if(1 == receivedAllReplies())
+	{
+		if(NON_DISTINGUISHED == node.isDistinguished)
+		{
+			int nodeDegree = node.numChildren + 1;
+			int maxDegree = (nodeDegree > node.maxChildDegree) ? nodeDegree : node.maxChildDegree;
+			struct _Message send_msg = CreateMessage(INFO,node.myUID,node.parentUID,msg.layer,0,maxDegree);
+			SendMessage(send_msg);
+		}
+		else
+		{
+			node.terminationDetected = 1;
+		}
+	}
+	else
+	{
+		//do nothing - wait for ACKs and NACKs 
+	}
 }
 
 int receivedAllReplies()
 {	
-	int i;
-	for(i = 0; i < node.numNeighbours; i++)
-	{
-		if(0 == node.neighbourReplies[i])
-		{
-			return 0;
-		}
-	}
-	return 1;
+	return (0 == node.outstandingMessageReplies);
 }
 
 void ResetReplies()
 {
-	int i;
-	for(i = 0; i < node.numNeighbours; i++)
-	{
-		node.neighbourReplies[i] = 0;
-	}
+	node.outstandingMessageReplies = 0;
 }
-
-void PrintReplies()
-{
-	int i;
-	printf("<%s,%s,%d> node.neighbourReplies[] : { ",__FILE__,__func__,__LINE__);
-	for(i = 0; i < node.numNeighbours; i++)
-	{
-		printf("%d\t",node.neighbourReplies[i]);
-	}
-	printf("}\n");
-}
-
 
 int getNeighbourIndex(int uid)
 {
@@ -432,6 +454,7 @@ void InitNode(char* pathToConfig,char* myUID)
 	node.messageQueue = NULL;
 	node.messageQueueTailPtr = NULL;
 	node.terminationDetected = 0;
+	node.outstandingMessageReplies = 0;
 
 	int i = 0;
 	for(i = 0; i < node.numNeighbours; i++)
