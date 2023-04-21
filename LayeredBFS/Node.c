@@ -50,7 +50,7 @@ void PrintBFSInfo(struct _Node node)
 	if(DISINGUISHED == node.isDistinguished)
 	{
 		printf("<%s,%s,%d>\tnode.degree : %d\n",__FILE__,__func__,__LINE__,node.numChildren);
-		printf("<%s,%s,%d>\tnode.maxChildDegree : %d\n",__FILE__,__func__,__LINE__,node.maxChildDegree);
+		printf("<%s,%s,%d>\tnode.maxDegree : %d\n",__FILE__,__func__,__LINE__,node.maxDegree);
 	}
 	else
 	{

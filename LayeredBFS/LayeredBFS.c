@@ -38,7 +38,6 @@ void HandleInfo(struct _Message);
 int getNeighbourIndex(int);
 int receivedAllReplies();
 void ResetReplies();
-//void PrintReplies();
 
 void LayeredBFS()
 {
@@ -394,9 +393,9 @@ void HandleInfo(struct _Message msg)
 {
 	node.outstandingMessageReplies = node.outstandingMessageReplies - 1;
 
-	if(msg.degree > node.maxChildDegree)
+	if(msg.degree > node.maxDegree)
 	{
-		node.maxChildDegree = msg.degree;
+		node.maxDegree = msg.degree;
 	}
 	else
 	{
@@ -406,7 +405,7 @@ void HandleInfo(struct _Message msg)
 	if(1 == receivedAllReplies())
 	{
 		int nodeDegree = node.numChildren + 1;
-		int maxDegree = (nodeDegree > node.maxChildDegree) ? nodeDegree : node.maxChildDegree;
+		int maxDegree = (nodeDegree > node.maxDegree) ? nodeDegree : node.maxDegree;
 		
 		if(NON_DISTINGUISHED == node.isDistinguished)
 		{

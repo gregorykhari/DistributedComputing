@@ -37,7 +37,7 @@ struct _Node
     int childrenUIDs[MAX_NEIGHBOURS];
     int numChildren;
     int isMarked;
-    int maxChildDegree;
+    int maxDegree;
     int terminationDetected;
 
     struct _MessageQueue* messageQueue;
